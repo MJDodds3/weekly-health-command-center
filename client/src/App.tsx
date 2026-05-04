@@ -344,13 +344,13 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
         : "text-muted-foreground";
 
   return (
-    <div className="grid grid-cols-[1.1fr_0.8fr_0.7fr_0.9fr] items-center gap-3 border-b border-border/70 py-3 last:border-0" data-testid={`row-metric-${metric.name.toLowerCase().replaceAll(" ", "-")}`}>
+    <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-b border-border/70 py-3 last:border-0 md:grid-cols-[1.1fr_0.8fr_0.7fr_0.9fr] md:gap-3" data-testid={`row-metric-${metric.name.toLowerCase().replaceAll(" ", "-")}`}>
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{metric.name}</p>
         <p className="mt-1 text-xs text-muted-foreground">Prior: {formatValue(metric.priorValue, metric.unit)}</p>
       </div>
-      <div>
-        <p className="font-mono text-lg font-semibold">{formatValue(metric.value, metric.unit)}</p>
+      <div className="text-right md:text-left">
+        <p className="font-mono text-base font-semibold md:text-lg">{formatValue(metric.value, metric.unit)}</p>
       </div>
       <div className={`flex items-center gap-1 font-mono text-sm ${tone}`}>
         {deltaPositive ? <ArrowUp className="size-3" /> : deltaNegative ? <ArrowDown className="size-3" /> : null}
@@ -469,11 +469,11 @@ function WeeklyDashboard() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-3 border-b bg-background/95 px-4 backdrop-blur">
+      <header className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur md:gap-3 md:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <SidebarTrigger data-testid="button-sidebar-toggle" />
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold">Weekly Health Command Center</h1>
+            <h1 className="truncate text-base font-semibold md:text-xl">Weekly Health Command Center</h1>
             <p className="truncate text-sm text-muted-foreground">
               {data.currentWindow} vs {data.priorWindow} · {data.cadence}
             </p>
@@ -487,22 +487,38 @@ function WeeklyDashboard() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto overscroll-contain p-4 md:p-6" data-testid="main-dashboard">
+      <nav className="sticky top-16 z-40 flex gap-2 overflow-x-auto border-b bg-background/95 px-3 py-2 backdrop-blur md:hidden" aria-label="Mobile section navigation">
+        {navItems.map((item) => (
+          <Button
+            key={item.target}
+            size="sm"
+            variant={item.target === "weekly-score" ? "secondary" : "ghost"}
+            className="shrink-0"
+            onClick={() => document.getElementById(item.target)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            data-testid={`mobile-nav-${item.label.toLowerCase().replaceAll(" ", "-")}`}
+          >
+            <item.icon className="size-4" />
+            {item.label}
+          </Button>
+        ))}
+      </nav>
+
+      <main className="flex-1 overflow-y-auto overscroll-contain p-3 md:p-6" data-testid="main-dashboard">
         <section id="weekly-score" className="scroll-mt-20 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
           <Card className="overflow-hidden" data-testid="card-weekly-score">
             <CardContent className="p-0">
-              <div className="bg-gradient-to-br from-primary/30 via-card to-indigo-950/40 p-6">
+              <div className="bg-gradient-to-br from-primary/30 via-card to-indigo-950/40 p-4 md:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.32em] text-primary">{data.organization}</p>
-                    <h2 className="mt-3 text-xl font-semibold">Weekly Health Report</h2>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary md:text-xs md:tracking-[0.32em]">{data.organization}</p>
+                    <h2 className="mt-3 text-lg font-semibold md:text-xl">Weekly Health Report</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{data.person} · {data.displayedRange}</p>
                   </div>
                   <Badge variant="outline" className="border-primary/40 text-primary">{data.scoreBand}</Badge>
                 </div>
-                <div className="mt-8 flex items-end justify-between gap-5">
+                <div className="mt-6 flex items-end justify-between gap-5 md:mt-8">
                   <div>
-                    <p className="font-mono text-6xl font-semibold leading-none text-primary">{data.score}</p>
+                    <p className="font-mono text-5xl font-semibold leading-none text-primary md:text-6xl">{data.score}</p>
                     <p className="mt-2 text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">Weekly Health Score</p>
                   </div>
                   <div className="text-right">
@@ -520,12 +536,12 @@ function WeeklyDashboard() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4">
             <Card data-testid="card-top-wins">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg"><Trophy className="size-5 text-emerald-400" />Top 3 wins</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 md:space-y-3">
                 {data.wins.map((win) => (
                   <div key={win.metric} className="rounded-md bg-emerald-500/10 p-3">
                     <p className="text-sm font-semibold">{win.metric}</p>
@@ -539,7 +555,7 @@ function WeeklyDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg"><Activity className="size-5 text-amber-400" />Focus areas</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 md:space-y-3">
                 {data.focusAreas.map((area) => (
                   <div key={area.metric} className="rounded-md bg-amber-500/10 p-3">
                     <p className="text-sm font-semibold">{area.metric}</p>
@@ -564,7 +580,7 @@ function WeeklyDashboard() {
                 <span className="flex items-center gap-2"><i className="block size-2 rounded-full" style={{ backgroundColor: chartColors.blue }} />Sleep score</span>
                 <span className="flex items-center gap-2"><i className="block h-0.5 w-4 border-t-2 border-dotted" style={{ borderColor: chartColors.gold }} />HRV index</span>
               </div>
-              <div className="h-64">
+              <div className="h-56 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.scoreTrend}>
                   <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
@@ -591,7 +607,7 @@ function WeeklyDashboard() {
                 <Badge variant="secondary">Achieved: {totalContribution}/100</Badge>
                 <Badge variant="outline">Weights sum: {totalWeight}%</Badge>
               </div>
-              <div className="h-64">
+              <div className="h-56 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={scoreByGroup} layout="vertical" margin={{ left: 40 }}>
                   <CartesianGrid stroke="hsl(var(--border))" horizontal={false} />
