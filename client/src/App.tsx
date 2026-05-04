@@ -188,12 +188,12 @@ const fallbackReport: WeeklyReport = {
 };
 
 const navItems = [
-  { label: "Weekly Score", icon: Sparkles },
-  { label: "Core Metrics", icon: Activity },
-  { label: "Metabolic", icon: Droplets },
-  { label: "Recovery", icon: Moon },
-  { label: "Databricks", icon: Database },
-  { label: "Labs Later", icon: HeartPulse },
+  { label: "Weekly Score", icon: Sparkles, target: "weekly-score" },
+  { label: "Core Metrics", icon: Activity, target: "core-metrics" },
+  { label: "Metabolic", icon: Droplets, target: "metabolic-health" },
+  { label: "Recovery", icon: Moon, target: "recovery" },
+  { label: "Databricks", icon: Database, target: "databricks" },
+  { label: "Labs Later", icon: HeartPulse, target: "labs-later" },
 ];
 
 const chartColors = {
@@ -222,7 +222,7 @@ function Logo() {
   );
 }
 
-function AppSidebar() {
+function AppSidebar({ activeSection, onNavigate }: { activeSection: string; onNavigate: (target: string) => void }) {
   return (
     <Sidebar data-testid="nav-sidebar">
       <SidebarHeader className="gap-3 px-4 py-4">
@@ -239,9 +239,13 @@ function AppSidebar() {
           <SidebarGroupLabel>Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item, index) => (
+              {navItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
-                  <SidebarMenuButton isActive={index === 0} data-testid={`nav-${item.label.toLowerCase().replaceAll(" ", "-")}`}>
+                  <SidebarMenuButton
+                    isActive={activeSection === item.target}
+                    onClick={() => onNavigate(item.target)}
+                    data-testid={`nav-${item.label.toLowerCase().replaceAll(" ", "-")}`}
+                  >
                     <item.icon />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
@@ -484,7 +488,7 @@ function WeeklyDashboard() {
       </header>
 
       <main className="flex-1 overflow-y-auto overscroll-contain p-4 md:p-6" data-testid="main-dashboard">
-        <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <section id="weekly-score" className="scroll-mt-20 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
           <Card className="overflow-hidden" data-testid="card-weekly-score">
             <CardContent className="p-0">
               <div className="bg-gradient-to-br from-primary/30 via-card to-indigo-950/40 p-6">
@@ -547,7 +551,7 @@ function WeeklyDashboard() {
           </div>
         </section>
 
-        <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <section id="core-metrics" className="scroll-mt-20 mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <Card data-testid="chart-score-trend">
             <CardHeader>
               <CardTitle className="text-lg">7-day signal trend</CardTitle>
@@ -611,7 +615,12 @@ function WeeklyDashboard() {
 
         <section className="mt-4 grid gap-4 xl:grid-cols-2">
           {grouped.map(([group, metrics]) => (
-            <Card key={group} data-testid={`card-group-${group.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and")}`}>
+            <Card
+              key={group}
+              id={group === "Metabolic Health" ? "metabolic-health" : group === "Sleep" || group === "Cardiovascular & Stress" ? "recovery" : undefined}
+              className="scroll-mt-20"
+              data-testid={`card-group-${group.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and")}`}
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   {group === "Body Composition" ? <Scale className="size-5" /> : group === "Metabolic Health" ? <Droplets className="size-5" /> : group === "Sleep" ? <Moon className="size-5" /> : group === "Cardiovascular & Stress" ? <HeartPulse className="size-5" /> : <Utensils className="size-5" />}
@@ -647,7 +656,7 @@ function WeeklyDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-databricks-contract">
+          <Card id="databricks" className="scroll-mt-20" data-testid="card-databricks-contract">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2 text-lg"><Database className="size-5" />Databricks weekly contract</CardTitle>
@@ -673,6 +682,7 @@ function WeeklyDashboard() {
                 <p className="mt-3 text-xs text-muted-foreground">{data.processingNote}</p>
               </div>
               <div className="rounded-md bg-muted p-4">
+                <div id="labs-later" className="scroll-mt-20" />
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Future modules</p>
                 <p className="mt-2 text-sm text-muted-foreground">Blood work, functional tests, medication/supplement adherence, and experiment annotations can slot in as new groups.</p>
               </div>
@@ -700,17 +710,23 @@ function AppRouter() {
 }
 
 function App() {
+  const [activeSection, setActiveSection] = useState("weekly-score");
   const sidebarStyle = {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
   } as CSSProperties;
+
+  function navigateToSection(target: string) {
+    setActiveSection(target);
+    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SidebarProvider style={sidebarStyle}>
           <div className="flex h-screen w-full">
-            <AppSidebar />
+            <AppSidebar activeSection={activeSection} onNavigate={navigateToSection} />
             <SidebarInset>
               <Router hook={useHashLocation}>
                 <AppRouter />
