@@ -1,0 +1,24 @@
+[build]
+  command = "npm run build"
+  publish = "dist/public"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/health/overview"
+  to = "/.netlify/functions/health-overview"
+  status = 200
+
+[[redirects]]
+  from = "/api/health/refresh"
+  to = "/.netlify/functions/health-refresh"
+  status = 200
+
+[[redirects]]
+  from = "/api/health/databricks/status"
+  to = "/.netlify/functions/databricks-status"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
