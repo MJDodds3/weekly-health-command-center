@@ -291,6 +291,10 @@ function formatDelta(delta: number | null) {
   return `${delta > 0 ? "+" : delta < 0 ? "-" : ""}${abs}`;
 }
 
+function formatRefreshTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function statusClass(status: string) {
   if (status.includes("Below") || status.includes("Above")) return "border-amber-500/30 bg-amber-500/10 text-amber-300";
   if (status.includes("Deficit")) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
@@ -443,7 +447,14 @@ function WeeklyDashboard() {
       if (payload.report) {
         queryClient.setQueryData(["/api/health/overview"], payload.report);
       }
-      setRefreshMessage(payload.message ?? (payload.refreshed ? "Refreshed from Databricks." : "Using latest exported snapshot."));
+      const refreshedReport = payload.report as WeeklyReport | undefined;
+      const sameWindow = Boolean(refreshedReport && refreshedReport.displayedRange === data?.displayedRange);
+      const baseMessage = payload.message ?? (payload.refreshed ? "Refreshed from Databricks." : "Using latest exported snapshot.");
+      setRefreshMessage(
+        refreshedReport && sameWindow
+          ? `${baseMessage} Latest Databricks data still ends at ${refreshedReport.displayedRange}, so the dashboard values did not change.`
+          : baseMessage
+      );
     } catch {
       setRefreshMessage("Refresh failed. Check server Databricks credentials and warehouse access.");
     } finally {
@@ -475,7 +486,7 @@ function WeeklyDashboard() {
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold md:text-xl">Weekly Health Command Center</h1>
             <p className="truncate text-sm text-muted-foreground">
-              {data.currentWindow} vs {data.priorWindow} · {data.cadence}
+              {data.currentWindow} vs {data.priorWindow} · Last refreshed {formatRefreshTime(data.updatedAt)}
             </p>
           </div>
         </div>
