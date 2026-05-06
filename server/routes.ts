@@ -6,6 +6,15 @@ const databricksReady =
   Boolean(process.env.DATABRICKS_TOKEN) &&
   Boolean(process.env.DATABRICKS_WAREHOUSE_ID);
 
+const refreshCacheTtlMs = Number(process.env.REFRESH_CACHE_MINUTES ?? 60) * 60 * 1000;
+let cachedRefresh:
+  | {
+      refreshedAt: number;
+      report: any;
+      rowCount: number;
+    }
+  | null = null;
+
 const metricMeta: Record<string, {
   group?: string;
   unit: string;
@@ -144,6 +153,17 @@ WITH preferences AS (
   SELECT 'Total Sleep' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Heart Rate Variability' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Stress Level' AS metric, 'oura' AS primary_source
+), anchor AS (
+  SELECT max(CAST(dt.date AS DATE)) AS anchor_date
+  FROM workspace.default.dailytracker_joined dt
+  WHERE dt.last_name = 'Dodds'
+    AND dt.first_name = 'Matthew'
+    AND CAST(dt.date AS DATE) >= date_sub(current_date(), 21)
+    AND dt.metric IN (
+      'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
+      'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
+      'Heart Rate Variability','Stress Level'
+    )
 ), ranked AS (
   SELECT
     CONCAT(dt.last_name, ', ', dt.first_name) AS Name,
@@ -157,15 +177,18 @@ WITH preferences AS (
     ) AS rn
   FROM workspace.default.dailytracker_joined dt
   LEFT JOIN preferences prefs ON dt.metric = prefs.metric
-  WHERE dt.metric IN (
+  CROSS JOIN anchor a
+  WHERE dt.last_name = 'Dodds'
+    AND dt.first_name = 'Matthew'
+    AND CAST(dt.date AS DATE) > date_sub(a.anchor_date, 14)
+    AND CAST(dt.date AS DATE) <= a.anchor_date
+    AND dt.metric IN (
     'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
     'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
     'Heart Rate Variability','Stress Level'
   )
 ), dedup AS (
   SELECT * FROM ranked WHERE rn = 1 AND Name = 'Dodds, Matthew'
-), anchor AS (
-  SELECT max(Date) AS anchor_date FROM dedup
 ), windows AS (
   SELECT
     d.*,
@@ -243,7 +266,7 @@ function buildReportFromRows(rows: StatementRow[]) {
       const name = String(row.metric);
       const meta = metricMeta[name];
       return {
-        group: meta.group,
+        group: meta.group ?? "Other",
         name,
         value: toNumber(row.current_avg),
         unit: meta.unit,
@@ -415,8 +438,29 @@ export async function refreshWeeklyReport() {
   }
 
   try {
+    if (cachedRefresh && Date.now() - cachedRefresh.refreshedAt < refreshCacheTtlMs) {
+      const minutesRemaining = Math.ceil((refreshCacheTtlMs - (Date.now() - cachedRefresh.refreshedAt)) / 60000);
+      return {
+        statusCode: 200,
+        payload: {
+          refreshed: true,
+          cached: true,
+          message: `Using cached Databricks result from ${new Date(cachedRefresh.refreshedAt).toLocaleTimeString()}. This prevents repeated warehouse queries; cache expires in about ${minutesRemaining} minutes.`,
+          report: {
+            ...cachedRefresh.report,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+    }
+
     const rows = await executeWeeklyMetricsQuery();
     const report = buildReportFromRows(rows);
+    cachedRefresh = {
+      refreshedAt: Date.now(),
+      report,
+      rowCount: rows.length,
+    };
     return {
       statusCode: 200,
       payload: {
