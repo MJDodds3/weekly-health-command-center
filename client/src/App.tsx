@@ -197,9 +197,12 @@ const fallbackReport: WeeklyReport = {
 
 const navItems = [
   { label: "Weekly Score", icon: Sparkles, target: "weekly-score" },
-  { label: "Core Metrics", icon: Activity, target: "core-metrics" },
+  { label: "Score Trends", icon: Activity, target: "score-trends" },
+  { label: "Body Composition", icon: Scale, target: "body-composition" },
   { label: "Metabolic", icon: Droplets, target: "metabolic-health" },
-  { label: "Recovery", icon: Moon, target: "recovery" },
+  { label: "Sleep", icon: Moon, target: "sleep" },
+  { label: "Cardiovascular & Stress", icon: HeartPulse, target: "cardiovascular-stress" },
+  { label: "Activity & Nutrition", icon: Utensils, target: "activity-nutrition" },
   { label: "Databricks", icon: Database, target: "databricks" },
   { label: "Labs Later", icon: HeartPulse, target: "labs-later" },
 ];
@@ -651,7 +654,7 @@ function WeeklyDashboard() {
           </div>
         </section>
 
-        <section id="core-metrics" className="scroll-mt-20 mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <section id="score-trends" className="scroll-mt-20 mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <Card data-testid="chart-score-trend">
             <CardHeader>
               <CardTitle className="text-lg">7-day signal trend</CardTitle>
@@ -717,7 +720,19 @@ function WeeklyDashboard() {
           {grouped.map(([group, metrics]) => (
             <Card
               key={group}
-              id={group === "Metabolic Health" ? "metabolic-health" : group === "Sleep" || group === "Cardiovascular & Stress" ? "recovery" : undefined}
+              id={
+                group === "Body Composition"
+                  ? "body-composition"
+                  : group === "Metabolic Health"
+                    ? "metabolic-health"
+                    : group === "Sleep"
+                      ? "sleep"
+                      : group === "Cardiovascular & Stress"
+                        ? "cardiovascular-stress"
+                        : group === "Activity & Nutrition"
+                          ? "activity-nutrition"
+                          : undefined
+              }
               className="scroll-mt-20"
               data-testid={`card-group-${group.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and")}`}
             >
