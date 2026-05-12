@@ -142,7 +142,21 @@ const coreMetrics = [
   { group: "Cardiovascular & Stress", name: "Resilience", value: 3.71428571, unit: "", delta: 0, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 3.71428571, source: "oura", currentN: 7, priorN: 7 },
   { group: "Activity & Nutrition", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
   { group: "Activity & Nutrition", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
-].map((metric) => ({ ...metric, ...evaluateTarget(metric.name, metric.value) }));
+].map((metric) => {
+  const target = evaluateTarget(metric.name, metric.value);
+  const dailyValues = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date("2026-05-06T00:00:00Z");
+    date.setUTCDate(date.getUTCDate() + index);
+    const wave = Math.sin(index / 1.8) * Math.max(Math.abs(metric.delta) / 3, Math.abs(metric.value) * 0.015);
+    const value = Number((metric.value + wave).toFixed(2));
+    return {
+      date: date.toISOString().slice(0, 10),
+      value,
+      ...evaluateTarget(metric.name, value),
+    };
+  });
+  return { ...metric, ...target, dailyValues };
+});
 
 const supportMetrics = [
   { name: "Calories Burned", value: 2883.28571429, unit: "cal", delta: -62.28571429, status: "On Target", band: "green", priorValue: 2945.57142857, source: "oura", currentN: 7, priorN: 7 },
@@ -288,7 +302,13 @@ SELECT
   count(CASE WHEN window_name='current_7d' THEN 1 END) AS current_n,
   avg(CASE WHEN window_name='prior_7d' THEN value END) AS prior_avg,
   count(CASE WHEN window_name='prior_7d' THEN 1 END) AS prior_n,
-  avg(CASE WHEN window_name='current_7d' THEN value END) - avg(CASE WHEN window_name='prior_7d' THEN value END) AS delta
+  avg(CASE WHEN window_name='current_7d' THEN value END) - avg(CASE WHEN window_name='prior_7d' THEN value END) AS delta,
+  to_json(
+    array_sort(
+      collect_list(named_struct('date', CAST(Date AS STRING), 'value', value))
+      FILTER (WHERE window_name='current_7d')
+    )
+  ) AS daily_values
 FROM windows
 WHERE window_name IN ('current_7d','prior_7d')
 GROUP BY metric
@@ -341,6 +361,12 @@ function buildReportFromRows(rows: StatementRow[]) {
     .map((row) => {
       const name = String(row.metric);
       const meta = metricMeta[name];
+      let dailyValues: Array<Record<string, string | number>> = [];
+      try {
+        dailyValues = typeof row.daily_values === "string" ? JSON.parse(row.daily_values) : [];
+      } catch {
+        dailyValues = [];
+      }
       return {
         group: meta.group ?? "Other",
         name,
@@ -352,6 +378,14 @@ function buildReportFromRows(rows: StatementRow[]) {
         source: String(row.source ?? ""),
         currentN: toNumber(row.current_n),
         priorN: toNumber(row.prior_n),
+        dailyValues: dailyValues.map((daily) => {
+          const value = toNumber(daily.value);
+          return {
+            date: String(daily.date),
+            value,
+            ...evaluateTarget(name, value),
+          };
+        }),
       };
     })
     .sort((a, b) => metricOrder.indexOf(a.name) - metricOrder.indexOf(b.name));

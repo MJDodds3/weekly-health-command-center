@@ -74,6 +74,12 @@ type CoreMetric = {
   source?: string;
   currentN?: number;
   priorN?: number;
+  dailyValues?: Array<{
+    date: string;
+    value: number;
+    band?: "green" | "yellow" | "red";
+    status?: string;
+  }>;
 };
 
 type SupportMetric = {
@@ -305,6 +311,44 @@ function statusClass(status: string, band?: string) {
   return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
 }
 
+function barColor(band?: string) {
+  if (band === "green") return "bg-green-400";
+  if (band === "yellow") return "bg-yellow-400";
+  if (band === "red") return "bg-red-400";
+  return "bg-muted-foreground";
+}
+
+function DailySparkBars({ metric }: { metric: CoreMetric }) {
+  const values = metric.dailyValues ?? [];
+  const displayValues = values.length ? values : Array.from({ length: 7 }, (_, index) => ({
+    date: `D${index + 1}`,
+    value: metric.value,
+    band: metric.band,
+    status: metric.status,
+  }));
+  const nums = displayValues.map((item) => item.value);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const span = Math.max(max - min, Math.abs(max) * 0.05, 1);
+
+  return (
+    <div className="flex h-8 items-end justify-end gap-1" title="Current 7-day daily values">
+      {displayValues.map((item, index) => {
+        const height = 25 + ((item.value - min) / span) * 75;
+        return (
+          <span
+            key={`${item.date}-${index}`}
+            className={`w-1.5 rounded-sm ${barColor(item.band)}`}
+            style={{ height: `${height}%` }}
+            title={`${item.date}: ${formatValue(item.value, metric.unit)} · ${item.status ?? metric.status}`}
+            aria-label={`${metric.name} ${item.date}: ${formatValue(item.value, metric.unit)}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
 
@@ -368,9 +412,9 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
       </div>
       <div className="flex items-center justify-end gap-2">
         <Badge variant="outline" className={statusClass(metric.status, metric.band)}>{metric.status}</Badge>
-        <Badge variant="outline" className={statusClass(metric.status, metric.band)} title="Score impact">
-          {metric.scoreImpact}/5
-        </Badge>
+        <div className="w-16">
+          <DailySparkBars metric={metric} />
+        </div>
       </div>
     </div>
   );
