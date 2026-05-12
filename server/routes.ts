@@ -43,6 +43,82 @@ const metricMeta: Record<string, {
   "Calories Consumed": { unit: "cal", status: "Above Target", direction: "warning", scoreImpact: 3, lowerIsBetter: true },
 };
 
+type TargetBand = "green" | "yellow" | "red";
+
+const mjdRanges: Record<string, {
+  green: string;
+  yellow: string;
+  red: string;
+}> = {
+  "Weight": { green: "<150", yellow: "150-160", red: ">160" },
+  "Body Fat": { green: "<10", yellow: "10-15", red: ">15" },
+  "Visceral Fat": { green: "<1", yellow: "1-3", red: ">3" },
+  "Cellular Water Ratio": { green: ">145", yellow: "135-145", red: "<135" },
+  "Glucose": { green: "<80", yellow: "80-110", red: ">110" },
+  "Ketones": { green: ">1.5", yellow: "0.5-1.5", red: "<0.5" },
+  "Insulin Load": { green: "<125", yellow: "125-175", red: ">175" },
+  "Total Sleep": { green: ">7", yellow: "5-7", red: "<5" },
+  "Sleep Efficiency": { green: ">85", yellow: "75-85", red: "<75" },
+  "Sleep Score": { green: ">85", yellow: "70-85", red: "<70" },
+  "Heart Rate Variability": { green: ">30", yellow: "20-30", red: "<20" },
+  "Resting HR": { green: "<70", yellow: "70-85", red: ">85" },
+  "Stress Level": { green: "<2", yellow: "2-4", red: ">4" },
+  "Resilience": { green: ">4", yellow: "2-4", red: "<2" },
+  "Steps": { green: ">10000", yellow: "7000-10000", red: "<7000" },
+  "Vo2max": { green: ">45", yellow: "35-45", red: "<35" },
+};
+
+function matchesRange(value: number, expression: string): boolean {
+  const expr = expression.replace(/\s/g, "");
+  if (expr.startsWith(">")) return value > Number(expr.slice(1));
+  if (expr.startsWith("<")) return value < Number(expr.slice(1));
+  if (expr.includes("-")) {
+    const [a, b] = expr.split("-").map(Number);
+    const low = Math.min(a, b);
+    const high = Math.max(a, b);
+    return value >= low && value <= high;
+  }
+  return false;
+}
+
+function statusFromExpression(expression: string): "Above Target" | "On Target" | "Below Target" {
+  const expr = expression.replace(/\s/g, "");
+  if (expr.startsWith(">")) return "Above Target";
+  if (expr.startsWith("<")) return "Below Target";
+  return "On Target";
+}
+
+function evaluateTarget(metric: string, value: number): {
+  status: "Above Target" | "On Target" | "Below Target";
+  band: TargetBand;
+  direction: "positive" | "neutral" | "warning";
+  scoreImpact: number;
+} {
+  const ranges = mjdRanges[metric];
+  if (!ranges) {
+    const fallback = metricMeta[metric] ?? { status: "On Target", direction: "neutral", scoreImpact: 5 };
+    return {
+      status: fallback.status as "Above Target" | "On Target" | "Below Target",
+      band: fallback.direction === "warning" ? "red" : fallback.direction === "neutral" ? "yellow" : "green",
+      direction: fallback.direction,
+      scoreImpact: fallback.scoreImpact,
+    };
+  }
+
+  const band: TargetBand = matchesRange(value, ranges.green)
+    ? "green"
+    : matchesRange(value, ranges.yellow)
+      ? "yellow"
+      : "red";
+  const expression = ranges[band];
+  return {
+    status: statusFromExpression(expression),
+    band,
+    direction: band === "green" ? "positive" : band === "yellow" ? "neutral" : "warning",
+    scoreImpact: band === "green" ? 5 : band === "yellow" ? 3 : 1,
+  };
+}
+
 const metricOrder = [
   "Weight", "Body Fat", "Visceral Fat", "Cellular Water Ratio", "Glucose", "Ketones", "Insulin Load",
   "Total Sleep", "Sleep Efficiency", "Sleep Score", "Heart Rate Variability", "Resting HR", "Stress Level",
@@ -66,11 +142,11 @@ const coreMetrics = [
   { group: "Cardiovascular & Stress", name: "Resilience", value: 3.71428571, unit: "", delta: 0, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 3.71428571, source: "oura", currentN: 7, priorN: 7 },
   { group: "Activity & Nutrition", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
   { group: "Activity & Nutrition", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
-];
+].map((metric) => ({ ...metric, ...evaluateTarget(metric.name, metric.value) }));
 
 const supportMetrics = [
-  { name: "Calories Burned", value: 2883.28571429, unit: "cal", delta: -62.28571429, status: "On Target", priorValue: 2945.57142857, source: "oura", currentN: 7, priorN: 7 },
-  { name: "Calories Consumed", value: 3231, unit: "cal", delta: 535.55714286, status: "Above Target", priorValue: 2695.44285714, source: "cronometer", currentN: 6, priorN: 7 },
+  { name: "Calories Burned", value: 2883.28571429, unit: "cal", delta: -62.28571429, status: "On Target", band: "green", priorValue: 2945.57142857, source: "oura", currentN: 7, priorN: 7 },
+  { name: "Calories Consumed", value: 3231, unit: "cal", delta: 535.55714286, status: "Above Target", band: "red", priorValue: 2695.44285714, source: "cronometer", currentN: 6, priorN: 7 },
   { name: "Avg Daily Balance", value: -347.71428571, unit: "cal/day", delta: -597.84285715, status: "Deficit", priorValue: 250.12857143, source: "derived", currentN: 6, priorN: 7 },
 ];
 
@@ -271,9 +347,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         value: toNumber(row.current_avg),
         unit: meta.unit,
         delta: toNumber(row.delta),
-        status: meta.status,
-        direction: meta.direction,
-        scoreImpact: meta.scoreImpact,
+        ...evaluateTarget(name, toNumber(row.current_avg)),
         priorValue: toNumber(row.prior_avg),
         source: String(row.source ?? ""),
         currentN: toNumber(row.current_n),
@@ -293,6 +367,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         unit: meta.unit,
         delta: toNumber(row.delta),
         status: meta.status,
+        band: meta.direction === "warning" ? "red" : "green",
         priorValue: toNumber(row.prior_avg),
         source: String(row.source ?? ""),
         currentN: toNumber(row.current_n),
@@ -311,6 +386,7 @@ function buildReportFromRows(rows: StatementRow[]) {
       unit: "cal/day",
       delta: value - priorValue,
       status: value < 0 ? "Deficit" : "Surplus",
+      band: value < 0 ? "green" : "red",
       priorValue,
       source: "derived",
       currentN: Math.min(caloriesBurned.currentN, caloriesConsumed.currentN),

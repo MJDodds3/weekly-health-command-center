@@ -70,6 +70,7 @@ type CoreMetric = {
   direction: MetricDirection;
   scoreImpact: number;
   priorValue: number;
+  band?: "green" | "yellow" | "red";
   source?: string;
   currentN?: number;
   priorN?: number;
@@ -81,6 +82,7 @@ type SupportMetric = {
   unit: string;
   delta: number | null;
   status: string;
+  band?: "green" | "yellow" | "red";
   priorValue: number | null;
   source?: string;
   currentN?: number;
@@ -295,8 +297,10 @@ function formatRefreshTime(value: string) {
   return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-function statusClass(status: string) {
-  if (status.includes("Below") || status.includes("Above")) return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+function statusClass(status: string, band?: string) {
+  if (band === "green") return "border-green-500/30 bg-green-500/10 text-green-300";
+  if (band === "yellow") return "border-yellow-500/30 bg-yellow-500/10 text-yellow-300";
+  if (band === "red") return "border-red-500/30 bg-red-500/10 text-red-300";
   if (status.includes("Deficit")) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
   return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
 }
@@ -341,11 +345,13 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
   const deltaPositive = metric.delta > 0;
   const deltaNegative = metric.delta < 0;
   const tone =
-    metric.direction === "positive"
-      ? "text-emerald-400"
-      : metric.direction === "warning"
-        ? "text-amber-400"
-        : "text-muted-foreground";
+    metric.band === "green" || metric.direction === "positive"
+      ? "text-green-400"
+      : metric.band === "red" || metric.direction === "warning"
+        ? "text-red-400"
+        : metric.band === "yellow"
+          ? "text-yellow-400"
+          : "text-muted-foreground";
 
   return (
     <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-b border-border/70 py-3 last:border-0 md:grid-cols-[1.1fr_0.8fr_0.7fr_0.9fr] md:gap-3" data-testid={`row-metric-${metric.name.toLowerCase().replaceAll(" ", "-")}`}>
@@ -361,7 +367,7 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
         {formatDelta(metric.delta)}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Badge variant="outline" className={statusClass(metric.status)}>{metric.status}</Badge>
+        <Badge variant="outline" className={statusClass(metric.status, metric.band)}>{metric.status}</Badge>
         <div className="hidden w-16 md:block">
           <Progress value={metric.scoreImpact * 20} />
         </div>
