@@ -70,14 +70,14 @@ type CoreMetric = {
   direction: MetricDirection;
   scoreImpact: number;
   priorValue: number;
-  band?: "green" | "yellow" | "red";
+  band?: "green" | "yellow" | "red" | "missing";
   source?: string;
   currentN?: number;
   priorN?: number;
   dailyValues?: Array<{
     date: string;
-    value: number;
-    band?: "green" | "yellow" | "red";
+    value: number | null;
+    band?: "green" | "yellow" | "red" | "missing";
     status?: string;
   }>;
 };
@@ -315,26 +315,27 @@ function barColor(band?: string) {
   if (band === "green") return "bg-green-400";
   if (band === "yellow") return "bg-yellow-400";
   if (band === "red") return "bg-red-400";
+  if (band === "missing") return "bg-slate-600";
   return "bg-muted-foreground";
 }
 
 const sparklineDomains: Record<string, { min: number; max: number }> = {
-  "Weight": { min: 140, max: 165 },
-  "Body Fat": { min: 5, max: 20 },
+  "Weight": { min: 130, max: 180 },
+  "Body Fat": { min: 0, max: 20 },
   "Visceral Fat": { min: 0, max: 5 },
   "Cellular Water Ratio": { min: 120, max: 160 },
-  "Glucose": { min: 60, max: 130 },
+  "Glucose": { min: 50, max: 130 },
   "Ketones": { min: 0, max: 2.5 },
-  "Insulin Load": { min: 0, max: 225 },
+  "Insulin Load": { min: 0, max: 275 },
   "Total Sleep": { min: 3, max: 9 },
   "Sleep Efficiency": { min: 60, max: 100 },
   "Sleep Score": { min: 50, max: 100 },
-  "Heart Rate Variability": { min: 0, max: 50 },
+  "Heart Rate Variability": { min: 0, max: 60 },
   "Resting HR": { min: 50, max: 100 },
   "Stress Level": { min: 0, max: 6 },
   "Resilience": { min: 0, max: 6 },
   "Steps": { min: 0, max: 15000 },
-  "Vo2max": { min: 35, max: 55 },
+  "Vo2max": { min: 30, max: 60 },
 };
 
 function DailySparkBars({ metric }: { metric: CoreMetric }) {
@@ -350,17 +351,20 @@ function DailySparkBars({ metric }: { metric: CoreMetric }) {
   return (
     <div className="flex h-8 items-end justify-end gap-1" title="Current 7-day daily values">
       {displayValues.map((item, index) => {
-        const normalized = domain
-          ? Math.max(0, Math.min(1, (item.value - domain.min) / (domain.max - domain.min)))
+        const value = item.value ?? domain?.min ?? 0;
+        const normalized = item.value === null
+          ? 0
+          : domain
+          ? Math.max(0, Math.min(1, (value - domain.min) / (domain.max - domain.min)))
           : 0.65;
-        const height = 35 + normalized * 55;
+        const height = item.value === null ? 25 : 35 + normalized * 55;
         return (
           <span
             key={`${item.date}-${index}`}
             className={`w-1.5 rounded-sm ${barColor(item.band)}`}
             style={{ height: `${height}%` }}
-            title={`${item.date}: ${formatValue(item.value, metric.unit)} · ${item.status ?? metric.status}`}
-            aria-label={`${metric.name} ${item.date}: ${formatValue(item.value, metric.unit)}`}
+            title={item.value === null ? `${item.date}: No data` : `${item.date}: ${formatValue(item.value, metric.unit)} · ${item.status ?? metric.status}`}
+            aria-label={item.value === null ? `${metric.name} ${item.date}: No data` : `${metric.name} ${item.date}: ${formatValue(item.value, metric.unit)}`}
           />
         );
       })}

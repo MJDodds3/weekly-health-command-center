@@ -344,6 +344,17 @@ function formatDisplayedRange(start: string, end: string): string {
   return `${startLabel} — ${endLabel}`;
 }
 
+function enumerateDates(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+  while (cursor <= endDate) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
 function formatMetricValue(value: number, unit: string): string {
   const rounded = Math.abs(value) >= 100 || unit === "cal" || unit === "steps" ? Math.round(value) : Math.abs(value) < 1 ? Number(value.toFixed(2)) : Number(value.toFixed(1));
   const formatted = Math.abs(rounded) >= 1000 ? rounded.toLocaleString() : Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(Math.abs(rounded) < 1 ? 2 : 1);
@@ -367,6 +378,28 @@ function buildReportFromRows(rows: StatementRow[]) {
       } catch {
         dailyValues = [];
       }
+      const dailyByDate = new Map(dailyValues.map((daily) => [String(daily.date), toNumber(daily.value)]));
+      const currentStart = String(row.current_start ?? "");
+      const currentEnd = String(row.current_end ?? "");
+      const filledDailyValues = enumerateDates(currentStart, currentEnd).map((date) => {
+        if (!dailyByDate.has(date)) {
+          return {
+            date,
+            value: null,
+            status: "No Data",
+            band: "missing",
+            direction: "neutral",
+            scoreImpact: 0,
+          };
+        }
+        const value = toNumber(dailyByDate.get(date));
+        return {
+          date,
+          value,
+          ...evaluateTarget(name, value),
+        };
+      });
+
       return {
         group: meta.group ?? "Other",
         name,
@@ -378,14 +411,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         source: String(row.source ?? ""),
         currentN: toNumber(row.current_n),
         priorN: toNumber(row.prior_n),
-        dailyValues: dailyValues.map((daily) => {
-          const value = toNumber(daily.value);
-          return {
-            date: String(daily.date),
-            value,
-            ...evaluateTarget(name, value),
-          };
-        }),
+        dailyValues: filledDailyValues,
       };
     })
     .sort((a, b) => metricOrder.indexOf(a.name) - metricOrder.indexOf(b.name));
