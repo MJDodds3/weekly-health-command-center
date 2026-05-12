@@ -54,3 +54,11 @@ netlify/functions/scheduled-weekly-refresh.ts
 ```
 
 It runs Friday at 22:00 UTC, which is Friday 3:00 PM during Pacific Daylight Time, refreshes from Databricks, and writes the shared latest report to Netlify Blobs.
+
+If Netlify Blobs is not available for the site, set this optional environment variable:
+
+```bash
+LIVE_OVERVIEW=true
+```
+
+With `LIVE_OVERVIEW=true`, each page load reads the latest Databricks 14-day rollup directly instead of relying on stored snapshot persistence. This is more current across devices, but can increase Databricks query frequency. Keep the query cache and warehouse auto-stop settings in place to control cost.

@@ -485,6 +485,19 @@ export async function refreshWeeklyReport() {
   }
 }
 
+export async function getOverviewReport() {
+  if (process.env.LIVE_OVERVIEW === "true" && databricksReady) {
+    try {
+      const rows = await executeWeeklyMetricsQuery();
+      return buildReportFromRows(rows);
+    } catch {
+      return weeklyReport;
+    }
+  }
+
+  return weeklyReport;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
