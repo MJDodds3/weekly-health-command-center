@@ -318,6 +318,25 @@ function barColor(band?: string) {
   return "bg-muted-foreground";
 }
 
+const sparklineDomains: Record<string, { min: number; max: number }> = {
+  "Weight": { min: 140, max: 165 },
+  "Body Fat": { min: 5, max: 20 },
+  "Visceral Fat": { min: 0, max: 5 },
+  "Cellular Water Ratio": { min: 120, max: 160 },
+  "Glucose": { min: 60, max: 130 },
+  "Ketones": { min: 0, max: 2.5 },
+  "Insulin Load": { min: 0, max: 225 },
+  "Total Sleep": { min: 3, max: 9 },
+  "Sleep Efficiency": { min: 60, max: 100 },
+  "Sleep Score": { min: 50, max: 100 },
+  "Heart Rate Variability": { min: 0, max: 50 },
+  "Resting HR": { min: 50, max: 100 },
+  "Stress Level": { min: 0, max: 6 },
+  "Resilience": { min: 0, max: 6 },
+  "Steps": { min: 0, max: 15000 },
+  "Vo2max": { min: 35, max: 55 },
+};
+
 function DailySparkBars({ metric }: { metric: CoreMetric }) {
   const values = metric.dailyValues ?? [];
   const displayValues = values.length ? values : Array.from({ length: 7 }, (_, index) => ({
@@ -326,15 +345,15 @@ function DailySparkBars({ metric }: { metric: CoreMetric }) {
     band: metric.band,
     status: metric.status,
   }));
-  const nums = displayValues.map((item) => item.value);
-  const min = Math.min(...nums);
-  const max = Math.max(...nums);
-  const span = Math.max(max - min, Math.abs(max) * 0.05, 1);
+  const domain = sparklineDomains[metric.name];
 
   return (
     <div className="flex h-8 items-end justify-end gap-1" title="Current 7-day daily values">
       {displayValues.map((item, index) => {
-        const height = 25 + ((item.value - min) / span) * 75;
+        const normalized = domain
+          ? Math.max(0, Math.min(1, (item.value - domain.min) / (domain.max - domain.min)))
+          : 0.65;
+        const height = 35 + normalized * 55;
         return (
           <span
             key={`${item.date}-${index}`}
