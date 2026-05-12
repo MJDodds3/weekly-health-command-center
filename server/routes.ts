@@ -355,6 +355,12 @@ function enumerateDates(start: string, end: string): string[] {
   return dates;
 }
 
+function dateAddDays(date: string, days: number): string {
+  const cursor = new Date(`${date}T00:00:00Z`);
+  cursor.setUTCDate(cursor.getUTCDate() + days);
+  return cursor.toISOString().slice(0, 10);
+}
+
 function formatMetricValue(value: number, unit: string): string {
   const rounded = Math.abs(value) >= 100 || unit === "cal" || unit === "steps" ? Math.round(value) : Math.abs(value) < 1 ? Number(value.toFixed(2)) : Number(value.toFixed(1));
   const formatted = Math.abs(rounded) >= 1000 ? rounded.toLocaleString() : Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(Math.abs(rounded) < 1 ? 2 : 1);
@@ -379,8 +385,9 @@ function buildReportFromRows(rows: StatementRow[]) {
         dailyValues = [];
       }
       const dailyByDate = new Map(dailyValues.map((daily) => [String(daily.date), toNumber(daily.value)]));
-      const currentStart = String(row.current_start ?? "");
-      const currentEnd = String(row.current_end ?? "");
+      const anchorDate = String(row.anchor_date ?? row.current_end ?? "");
+      const currentStart = anchorDate ? dateAddDays(anchorDate, -6) : String(row.current_start ?? "");
+      const currentEnd = anchorDate || String(row.current_end ?? "");
       const filledDailyValues = enumerateDates(currentStart, currentEnd).map((date) => {
         if (!dailyByDate.has(date)) {
           return {
