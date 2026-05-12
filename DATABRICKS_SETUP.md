@@ -21,6 +21,7 @@ The refresh endpoint:
 - Polls until the SQL statement succeeds.
 - Transforms the result into the dashboard JSON schema.
 - Returns the updated report to the frontend Refresh button.
+- Stores the updated report in Netlify Blobs so every device sees the same latest data on page load.
 
 If the env vars are missing, Refresh safely falls back to the latest exported Databricks snapshot and shows a status message.
 
@@ -45,3 +46,11 @@ DATABRICKS_WAREHOUSE_ID=33ede2bc605f8cd7
 ```
 
 Then redeploy the site. The Refresh button will call the Netlify Function and update the dashboard from Databricks on demand.
+
+The site also includes a scheduled Netlify Function:
+
+```text
+netlify/functions/scheduled-weekly-refresh.ts
+```
+
+It runs Friday at 22:00 UTC, which is Friday 3:00 PM during Pacific Daylight Time, refreshes from Databricks, and writes the shared latest report to Netlify Blobs.
