@@ -368,9 +368,9 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
       </div>
       <div className="flex items-center justify-end gap-2">
         <Badge variant="outline" className={statusClass(metric.status, metric.band)}>{metric.status}</Badge>
-        <div className="hidden w-16 md:block">
-          <Progress value={metric.scoreImpact * 20} />
-        </div>
+        <Badge variant="outline" className={statusClass(metric.status, metric.band)} title="Score impact">
+          {metric.scoreImpact}/5
+        </Badge>
       </div>
     </div>
   );
