@@ -562,7 +562,7 @@ function WeeklyDashboard() {
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold md:text-xl">Weekly Health Command Center</h1>
             <p className="truncate text-sm text-muted-foreground">
-              {data.currentWindow} vs {data.priorWindow} · Last refreshed {formatRefreshTime(data.updatedAt)}
+              Current: {data.currentWindow} · Compared with: {data.priorWindow} · Last refreshed {formatRefreshTime(data.updatedAt)}
             </p>
           </div>
         </div>
