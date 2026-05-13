@@ -125,6 +125,29 @@ const metricOrder = [
   "Resilience", "Steps", "Vo2max", "Calories Burned", "Calories Consumed",
 ];
 
+const focusPriority: Record<string, number> = {
+  "Calories Consumed": 1,
+  "Insulin Load": 2,
+  "Ketones": 3,
+  "Heart Rate Variability": 4,
+  "Glucose": 5,
+  "Total Sleep": 6,
+  "Resting HR": 7,
+  "Stress Level": 8,
+  "Steps": 9,
+  "Vo2max": 10,
+  "Visceral Fat": 11,
+  "Body Fat": 12,
+  "Cellular Water Ratio": 13,
+  "Weight": 14,
+};
+
+function focusSeverity(band?: string) {
+  if (band === "red") return 0;
+  if (band === "yellow") return 1;
+  return 9;
+}
+
 const coreMetrics = [
   { group: "Body Composition", name: "Weight", value: 154.75005189, unit: "lb", delta: 1.03824189, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 153.71181, source: "withings2", currentN: 7, priorN: 7 },
   { group: "Body Composition", name: "Body Fat", value: 8.09642857, unit: "%", delta: 0.06342857, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 8.033, source: "withings2", currentN: 7, priorN: 7 },
@@ -480,15 +503,28 @@ function buildReportFromRows(rows: StatementRow[]) {
     }));
 
   const focusAreas = [
-    ...support.filter((metric) => metric.status !== "On Target").map((metric) => ({
-      metric: metric.name,
-      text: `${formatMetricValue(metric.value, metric.unit)} — ${metric.status}${metric.delta !== null ? ` (${metric.delta > 0 ? "+" : ""}${formatMetricValue(metric.delta, metric.unit)} vs prior week)` : ""}`,
-    })),
-    ...core.filter((metric) => metric.status !== "On Target").map((metric) => ({
-      metric: metric.name,
-      text: `${formatMetricValue(metric.value, metric.unit)} — ${metric.status}${Math.abs(metric.delta) > 0 ? ` (${metric.delta > 0 ? "+" : ""}${formatMetricValue(metric.delta, metric.unit)} vs prior week)` : ""}`,
-    })),
-  ].slice(0, 4);
+    ...support
+      .filter((metric) => metric.band && metric.band !== "green" && metric.name !== "Avg Daily Balance")
+      .map((metric) => ({
+        metric: metric.name,
+        band: metric.band,
+        scoreImpact: metric.band === "red" ? 1 : 3,
+        priority: focusPriority[metric.name] ?? 99,
+        text: `${formatMetricValue(metric.value, metric.unit)} — ${metric.status}${metric.delta !== null ? ` (${metric.delta > 0 ? "+" : ""}${formatMetricValue(metric.delta, metric.unit)} vs prior week)` : ""}`,
+      })),
+    ...core
+      .filter((metric) => metric.band && metric.band !== "green")
+      .map((metric) => ({
+        metric: metric.name,
+        band: metric.band,
+        scoreImpact: metric.scoreImpact,
+        priority: focusPriority[metric.name] ?? 99,
+        text: `${formatMetricValue(metric.value, metric.unit)} — ${metric.status}${Math.abs(metric.delta) > 0 ? ` (${metric.delta > 0 ? "+" : ""}${formatMetricValue(metric.delta, metric.unit)} vs prior week)` : ""}`,
+      })),
+  ]
+    .sort((a, b) => focusSeverity(a.band) - focusSeverity(b.band) || a.scoreImpact - b.scoreImpact || a.priority - b.priority)
+    .slice(0, 4)
+    .map(({ metric, text }) => ({ metric, text }));
 
   return {
     ...weeklyReport,
