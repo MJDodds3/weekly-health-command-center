@@ -629,13 +629,9 @@ export async function refreshWeeklyReport() {
 }
 
 export async function getOverviewReport() {
-  if (process.env.LIVE_OVERVIEW === "true" && databricksReady) {
-    try {
-      const rows = await executeWeeklyMetricsQuery();
-      return buildReportFromRows(rows);
-    } catch {
-      return weeklyReport;
-    }
+  if (process.env.LIVE_OVERVIEW !== "false" && databricksReady) {
+    const result = await refreshWeeklyReport();
+    if (result.payload.report) return result.payload.report;
   }
 
   return weeklyReport;
@@ -645,8 +641,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.get("/api/health/overview", (_req, res) => {
-    res.json(getWeeklyReport());
+  app.get("/api/health/overview", async (_req, res) => {
+    res.json(await getOverviewReport());
   });
 
   app.post("/api/health/refresh", async (_req, res) => {
