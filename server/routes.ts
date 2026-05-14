@@ -264,15 +264,20 @@ export function getWeeklyReport() {
 const weeklyMetricsSql = `
 WITH nutrition_raw AS (
   SELECT
-    CONCAT(last_name, ', ', first_name) AS Name,
+    'Dodds, Matthew' AS Name,
     CAST(timestamp AS DATE) AS Date,
     CAST(fat AS DOUBLE) AS Fat,
     CAST(protein AS DOUBLE) AS Protein,
     CAST(carbohydrate AS DOUBLE) - CAST(fiber AS DOUBLE) AS Net_Carbs,
     'cronometer' AS source
   FROM workspace.default.metric_macronutrients
-  WHERE last_name = 'Dodds'
-    AND first_name = 'Matthew'
+  WHERE user_uuid IN (
+      SELECT DISTINCT user_uuid
+      FROM workspace.default.dailytracker_joined
+      WHERE last_name = 'Dodds'
+        AND first_name = 'Matthew'
+        AND user_uuid IS NOT NULL
+    )
     AND CAST(timestamp AS DATE) >= date_sub(current_date(), 21)
 ), nutrition_long AS (
   SELECT Name, Date, 'Fat' AS metric, Fat AS value, source FROM nutrition_raw WHERE Fat IS NOT NULL UNION ALL
