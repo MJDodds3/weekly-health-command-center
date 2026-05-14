@@ -703,21 +703,6 @@ async function executeSql(statement: string): Promise<StatementRow[]> {
   return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
 }
 
-export async function listCronometerMetrics() {
-  if (!databricksReady) return [];
-  return executeSql(`
-    SELECT metric, count(*) AS n, min(CAST(date AS DATE)) AS min_date, max(CAST(date AS DATE)) AS max_date, avg(value) AS avg_value
-    FROM workspace.default.dailytracker_joined
-    WHERE lower(source) = 'cronometer'
-      AND last_name = 'Dodds'
-      AND first_name = 'Matthew'
-      AND CAST(date AS DATE) >= date_sub(current_date(), 45)
-    GROUP BY metric
-    ORDER BY metric
-    LIMIT 300
-  `);
-}
-
 export async function refreshWeeklyReport() {
   if (!databricksReady) {
     return {
@@ -806,14 +791,6 @@ export async function registerRoutes(
 
   app.get("/api/health/databricks/status", (_req, res) => {
     res.json(weeklyReport.databricks);
-  });
-
-  app.get("/api/health/debug/cronometer-metrics", async (_req, res) => {
-    try {
-      res.json({ metrics: await listCronometerMetrics() });
-    } catch (error) {
-      res.status(502).json({ error: error instanceof Error ? error.message : "Cronometer metric lookup failed." });
-    }
   });
 
   return httpServer;
