@@ -672,6 +672,52 @@ async function executeWeeklyMetricsQuery(): Promise<StatementRow[]> {
   return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
 }
 
+async function executeSql(statement: string): Promise<StatementRow[]> {
+  const submit = await databricksRequest("/api/2.0/sql/statements", {
+    method: "POST",
+    body: JSON.stringify({
+      warehouse_id: process.env.DATABRICKS_WAREHOUSE_ID,
+      statement,
+      wait_timeout: "10s",
+      on_wait_timeout: "CONTINUE",
+      format: "JSON_ARRAY",
+    }),
+  });
+
+  const statementId = submit.statement_id;
+  if (!statementId) throw new Error("Databricks did not return a statement_id.");
+
+  let result = submit;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const state = result.status?.state;
+    if (state === "SUCCEEDED") break;
+    if (state === "FAILED" || state === "CANCELED") throw new Error(`Databricks statement ${state}: ${JSON.stringify(result.status)}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    result = await databricksRequest(`/api/2.0/sql/statements/${statementId}`);
+  }
+
+  if (result.status?.state !== "SUCCEEDED") throw new Error("Databricks statement timed out.");
+
+  const columns = result.manifest?.schema?.columns?.map((column: { name: string }) => column.name) ?? [];
+  const data = result.result?.data_array ?? [];
+  return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
+}
+
+export async function listCronometerMetrics() {
+  if (!databricksReady) return [];
+  return executeSql(`
+    SELECT metric, count(*) AS n, min(CAST(date AS DATE)) AS min_date, max(CAST(date AS DATE)) AS max_date, avg(value) AS avg_value
+    FROM workspace.default.dailytracker_joined
+    WHERE lower(source) = 'cronometer'
+      AND last_name = 'Dodds'
+      AND first_name = 'Matthew'
+      AND CAST(date AS DATE) >= date_sub(current_date(), 45)
+    GROUP BY metric
+    ORDER BY metric
+    LIMIT 300
+  `);
+}
+
 export async function refreshWeeklyReport() {
   if (!databricksReady) {
     return {
@@ -760,6 +806,14 @@ export async function registerRoutes(
 
   app.get("/api/health/databricks/status", (_req, res) => {
     res.json(weeklyReport.databricks);
+  });
+
+  app.get("/api/health/debug/cronometer-metrics", async (_req, res) => {
+    try {
+      res.json({ metrics: await listCronometerMetrics() });
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : "Cronometer metric lookup failed." });
+    }
   });
 
   return httpServer;
