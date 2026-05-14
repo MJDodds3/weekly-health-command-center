@@ -262,7 +262,23 @@ export function getWeeklyReport() {
 }
 
 const weeklyMetricsSql = `
-WITH preferences AS (
+WITH nutrition_raw AS (
+  SELECT
+    CONCAT(last_name, ', ', first_name) AS Name,
+    CAST(timestamp AS DATE) AS Date,
+    CAST(fat AS DOUBLE) AS Fat,
+    CAST(protein AS DOUBLE) AS Protein,
+    CAST(carbohydrate AS DOUBLE) - CAST(fiber AS DOUBLE) AS Net_Carbs,
+    'cronometer' AS source
+  FROM workspace.default.metric_macronutrients
+  WHERE last_name = 'Dodds'
+    AND first_name = 'Matthew'
+    AND CAST(timestamp AS DATE) >= date_sub(current_date(), 21)
+), nutrition_long AS (
+  SELECT Name, Date, 'Fat' AS metric, Fat AS value, source FROM nutrition_raw WHERE Fat IS NOT NULL UNION ALL
+  SELECT Name, Date, 'Protein' AS metric, Protein AS value, source FROM nutrition_raw WHERE Protein IS NOT NULL UNION ALL
+  SELECT Name, Date, 'Net Carbs' AS metric, Net_Carbs AS value, source FROM nutrition_raw WHERE Net_Carbs IS NOT NULL
+), preferences AS (
   SELECT 'Weight' AS metric, 'withings2' AS primary_source UNION ALL
   SELECT 'Body Fat' AS metric, 'withings2' AS primary_source UNION ALL
   SELECT 'Visceral Fat' AS metric, 'withings2' AS primary_source UNION ALL
@@ -283,19 +299,23 @@ WITH preferences AS (
   SELECT 'Stress Level' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Fat' AS metric, 'cronometer' AS primary_source UNION ALL
   SELECT 'Protein' AS metric, 'cronometer' AS primary_source UNION ALL
-  SELECT 'Net Carbs' AS metric, 'cronometer' AS primary_source UNION ALL
-  SELECT 'Sodium' AS metric, 'cronometer' AS primary_source
+  SELECT 'Net Carbs' AS metric, 'cronometer' AS primary_source
 ), anchor AS (
-  SELECT max(CAST(dt.date AS DATE)) AS anchor_date
-  FROM workspace.default.dailytracker_joined dt
-  WHERE dt.last_name = 'Dodds'
-    AND dt.first_name = 'Matthew'
-    AND CAST(dt.date AS DATE) >= date_sub(current_date(), 21)
-    AND dt.metric IN (
-      'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
-      'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
-      'Heart Rate Variability','Stress Level','Fat','Total Fat','Protein','Net Carbs','Net Carbohydrates','Sodium'
-    )
+  SELECT max(Date) AS anchor_date
+  FROM (
+    SELECT CAST(dt.date AS DATE) AS Date
+    FROM workspace.default.dailytracker_joined dt
+    WHERE dt.last_name = 'Dodds'
+      AND dt.first_name = 'Matthew'
+      AND CAST(dt.date AS DATE) >= date_sub(current_date(), 21)
+      AND dt.metric IN (
+        'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
+        'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
+        'Heart Rate Variability','Stress Level'
+      )
+    UNION ALL
+    SELECT Date FROM nutrition_long
+  )
 ), ranked AS (
   SELECT
     CONCAT(dt.last_name, ', ', dt.first_name) AS Name,
@@ -335,8 +355,20 @@ WITH preferences AS (
     AND dt.metric IN (
     'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
     'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
-    'Heart Rate Variability','Stress Level','Fat','Total Fat','Protein','Net Carbs','Net Carbohydrates','Sodium'
+    'Heart Rate Variability','Stress Level'
   )
+  UNION ALL
+  SELECT
+    Name,
+    Date,
+    metric,
+    value,
+    source,
+    1 AS rn
+  FROM nutrition_long n
+  CROSS JOIN anchor a
+  WHERE n.Date > date_sub(a.anchor_date, 14)
+    AND n.Date <= a.anchor_date
 ), dedup AS (
   SELECT * FROM ranked WHERE rn = 1 AND Name = 'Dodds, Matthew'
 ), windows AS (
