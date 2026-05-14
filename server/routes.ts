@@ -776,6 +776,24 @@ export async function getOverviewReport() {
   return weeklyReport;
 }
 
+export async function searchNutritionSources() {
+  if (!databricksReady) return [];
+  return executeSql(`
+    SELECT table_catalog, table_schema, table_name, column_name, data_type
+    FROM system.information_schema.columns
+    WHERE lower(table_name) LIKE '%cronometer%'
+       OR lower(table_name) LIKE '%nutrition%'
+       OR lower(table_name) LIKE '%nutrient%'
+       OR lower(column_name) LIKE '%protein%'
+       OR lower(column_name) LIKE '%sodium%'
+       OR lower(column_name) LIKE '%carb%'
+       OR lower(column_name) LIKE '%fat%'
+       OR lower(column_name) LIKE '%macro%'
+    ORDER BY table_catalog, table_schema, table_name, column_name
+    LIMIT 500
+  `);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
