@@ -70,14 +70,14 @@ type CoreMetric = {
   direction: MetricDirection;
   scoreImpact: number;
   priorValue: number;
-  band?: "green" | "yellow" | "red" | "missing";
+  band?: "green" | "yellow" | "red" | "missing" | "neutral";
   source?: string;
   currentN?: number;
   priorN?: number;
   dailyValues?: Array<{
     date: string;
     value: number | null;
-    band?: "green" | "yellow" | "red" | "missing";
+    band?: "green" | "yellow" | "red" | "missing" | "neutral";
     status?: string;
   }>;
 };
@@ -93,6 +93,18 @@ type SupportMetric = {
   source?: string;
   currentN?: number;
   priorN?: number;
+};
+
+type NutritionMetric = {
+  name: string;
+  value: number;
+  unit: string;
+  delta: number;
+  priorValue: number;
+  source?: string;
+  currentN?: number;
+  priorN?: number;
+  dailyValues?: CoreMetric["dailyValues"];
 };
 
 type WeeklyReport = {
@@ -113,6 +125,7 @@ type WeeklyReport = {
   focusAreas: Array<{ metric: string; text: string }>;
   coreMetrics: CoreMetric[];
   supportMetrics: SupportMetric[];
+  nutritionMetrics?: NutritionMetric[];
   scoreTrend: Array<{ date: string; score: number; glucose: number; glucoseIndex: number; sleepScore: number; hrv: number; hrvIndex: number }>;
   databricks: {
     ready: boolean;
@@ -140,8 +153,8 @@ const fallbackCoreMetrics: CoreMetric[] = [
   { group: "Cardiovascular & Stress", name: "Resting HR", value: 73.85714286, unit: "bpm", delta: -0.42857143, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 74.28571429, source: "oura", currentN: 7, priorN: 7 },
   { group: "Cardiovascular & Stress", name: "Stress Level", value: 2.16666667, unit: "", delta: -0.11904762, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 2.28571429, source: "oura", currentN: 6, priorN: 7 },
   { group: "Cardiovascular & Stress", name: "Resilience", value: 3.71428571, unit: "", delta: 0, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 3.71428571, source: "oura", currentN: 7, priorN: 7 },
-  { group: "Activity & Nutrition", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
-  { group: "Activity & Nutrition", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
+  { group: "Activity", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
+  { group: "Activity", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
 ];
 
 const fallbackReport: WeeklyReport = {
@@ -175,6 +188,7 @@ const fallbackReport: WeeklyReport = {
     { name: "Calories Consumed", value: 3231, unit: "cal", delta: 535.55714286, status: "Above Target", priorValue: 2695.44285714, source: "cronometer", currentN: 6, priorN: 7 },
     { name: "Avg Daily Balance", value: -347.71428571, unit: "cal/day", delta: -597.84285715, status: "Deficit", priorValue: 250.12857143, source: "derived", currentN: 6, priorN: 7 },
   ],
+  nutritionMetrics: [],
   scoreTrend: [
     { date: "04-28", score: 82, glucose: 83, glucoseIndex: 91, sleepScore: 80, hrv: 24, hrvIndex: 68 },
     { date: "04-29", score: 84, glucose: 82, glucoseIndex: 92, sleepScore: 82, hrv: 23, hrvIndex: 66 },
@@ -202,7 +216,8 @@ const navItems = [
   { label: "Metabolic", icon: Droplets, target: "metabolic-health" },
   { label: "Sleep", icon: Moon, target: "sleep" },
   { label: "Cardiovascular & Stress", icon: HeartPulse, target: "cardiovascular-stress" },
-  { label: "Activity & Nutrition", icon: Utensils, target: "activity-nutrition" },
+  { label: "Activity", icon: Activity, target: "activity" },
+  { label: "Nutrition", icon: Utensils, target: "nutrition" },
   { label: "Databricks", icon: Database, target: "databricks" },
   { label: "Labs Later", icon: HeartPulse, target: "labs-later" },
 ];
@@ -220,7 +235,7 @@ const categoryWeights: Record<string, number> = {
   "Metabolic Health": 20,
   Sleep: 23,
   "Cardiovascular & Stress": 25,
-  "Activity & Nutrition": 12,
+  "Activity": 12,
 };
 
 function Logo() {
@@ -319,6 +334,7 @@ function barColor(band?: string) {
   if (band === "yellow") return "bg-yellow-400";
   if (band === "red") return "bg-red-400";
   if (band === "missing") return "bg-slate-600";
+  if (band === "neutral") return "bg-sky-400";
   return "bg-muted-foreground";
 }
 
@@ -339,9 +355,13 @@ const sparklineDomains: Record<string, { min: number; max: number }> = {
   "Resilience": { min: 0, max: 6 },
   "Steps": { min: 0, max: 15000 },
   "Vo2max": { min: 30, max: 60 },
+  "Fat": { min: 0, max: 250 },
+  "Protein": { min: 0, max: 250 },
+  "Net Carbs": { min: 0, max: 150 },
+  "Sodium": { min: 0, max: 5000 },
 };
 
-function DailySparkBars({ metric }: { metric: CoreMetric }) {
+function DailySparkBars({ metric }: { metric: Pick<CoreMetric, "name" | "value" | "unit" | "band" | "status" | "dailyValues"> }) {
   const values = metric.dailyValues ?? [];
   const displayValues = values.length ? values : Array.from({ length: 7 }, (_, index) => ({
     date: `D${index + 1}`,
@@ -440,6 +460,30 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
         <Badge variant="outline" className={statusClass(metric.status, metric.band)}>{metric.status}</Badge>
         <div className="w-16">
           <DailySparkBars metric={metric} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NutritionRow({ metric }: { metric: NutritionMetric }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-b border-border/70 py-3 last:border-0 md:grid-cols-[1.1fr_0.8fr_0.7fr_0.9fr] md:gap-3" data-testid={`row-nutrition-${metric.name.toLowerCase().replaceAll(" ", "-")}`}>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{metric.name}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Prior: {formatValue(metric.priorValue, metric.unit)}</p>
+      </div>
+      <div className="text-right md:text-left">
+        <p className="font-mono text-base font-semibold md:text-lg">{formatValue(metric.value, metric.unit)}</p>
+      </div>
+      <div className={`flex items-center gap-1 font-mono text-sm ${metric.delta > 0 ? "text-sky-300" : metric.delta < 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
+        {metric.delta > 0 ? <ArrowUp className="size-3" /> : metric.delta < 0 ? <ArrowDown className="size-3" /> : null}
+        {formatDelta(metric.delta)}
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-300">Tracked</Badge>
+        <div className="w-16">
+          <DailySparkBars metric={{ ...metric, band: "neutral", status: "Tracked" }} />
         </div>
       </div>
     </div>
@@ -729,8 +773,8 @@ function WeeklyDashboard() {
                       ? "sleep"
                       : group === "Cardiovascular & Stress"
                         ? "cardiovascular-stress"
-                        : group === "Activity & Nutrition"
-                          ? "activity-nutrition"
+                        : group === "Activity"
+                          ? "activity"
                           : undefined
               }
               className="scroll-mt-20"
@@ -747,6 +791,22 @@ function WeeklyDashboard() {
               </CardContent>
             </Card>
           ))}
+        </section>
+
+        <section id="nutrition" className="scroll-mt-20 mt-4">
+          <Card data-testid="card-nutrition">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg"><Utensils className="size-5" />Nutrition</CardTitle>
+              <p className="text-sm text-muted-foreground">Daily Cronometer macros and sodium. These are tracked but not scored until target ranges are defined.</p>
+            </CardHeader>
+            <CardContent>
+              {(data.nutritionMetrics ?? []).length ? (
+                data.nutritionMetrics?.map((metric) => <NutritionRow key={metric.name} metric={metric} />)
+              ) : (
+                <p className="text-sm text-muted-foreground">No Cronometer nutrition rows found for Fat, Protein, Net Carbs, or Sodium in the current window.</p>
+              )}
+            </CardContent>
+          </Card>
         </section>
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">

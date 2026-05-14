@@ -37,10 +37,17 @@ const metricMeta: Record<string, {
   "Resting HR": { group: "Cardiovascular & Stress", unit: "bpm", status: "On Target", direction: "positive", scoreImpact: 5, lowerIsBetter: true },
   "Stress Level": { group: "Cardiovascular & Stress", unit: "", status: "On Target", direction: "positive", scoreImpact: 5, lowerIsBetter: true },
   "Resilience": { group: "Cardiovascular & Stress", unit: "", status: "On Target", direction: "neutral", scoreImpact: 5 },
-  "Steps": { group: "Activity & Nutrition", unit: "steps", status: "Above Target", direction: "warning", scoreImpact: 3 },
-  "Vo2max": { group: "Activity & Nutrition", unit: "ml/kg/min", status: "On Target", direction: "positive", scoreImpact: 5 },
+  "Steps": { group: "Activity", unit: "steps", status: "Above Target", direction: "warning", scoreImpact: 3 },
+  "Vo2max": { group: "Activity", unit: "ml/kg/min", status: "On Target", direction: "positive", scoreImpact: 5 },
   "Calories Burned": { unit: "cal", status: "On Target", direction: "neutral", scoreImpact: 5 },
   "Calories Consumed": { unit: "cal", status: "Above Target", direction: "warning", scoreImpact: 3, lowerIsBetter: true },
+};
+
+const nutritionMeta: Record<string, { unit: string }> = {
+  "Fat": { unit: "g" },
+  "Protein": { unit: "g" },
+  "Net Carbs": { unit: "g" },
+  "Sodium": { unit: "mg" },
 };
 
 type TargetBand = "green" | "yellow" | "red";
@@ -163,8 +170,8 @@ const coreMetrics = [
   { group: "Cardiovascular & Stress", name: "Resting HR", value: 73.85714286, unit: "bpm", delta: -0.42857143, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 74.28571429, source: "oura", currentN: 7, priorN: 7 },
   { group: "Cardiovascular & Stress", name: "Stress Level", value: 2.16666667, unit: "", delta: -0.11904762, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 2.28571429, source: "oura", currentN: 6, priorN: 7 },
   { group: "Cardiovascular & Stress", name: "Resilience", value: 3.71428571, unit: "", delta: 0, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 3.71428571, source: "oura", currentN: 7, priorN: 7 },
-  { group: "Activity & Nutrition", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
-  { group: "Activity & Nutrition", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
+  { group: "Activity", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
+  { group: "Activity", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
 ].map((metric) => {
   const target = evaluateTarget(metric.name, metric.value);
   const dailyValues = Array.from({ length: 7 }, (_, index) => {
@@ -185,6 +192,13 @@ const supportMetrics = [
   { name: "Calories Burned", value: 2883.28571429, unit: "cal", delta: -62.28571429, status: "On Target", band: "green", priorValue: 2945.57142857, source: "oura", currentN: 7, priorN: 7 },
   { name: "Calories Consumed", value: 3231, unit: "cal", delta: 535.55714286, status: "Above Target", band: "red", priorValue: 2695.44285714, source: "cronometer", currentN: 6, priorN: 7 },
   { name: "Avg Daily Balance", value: -347.71428571, unit: "cal/day", delta: -597.84285715, status: "Deficit", priorValue: 250.12857143, source: "derived", currentN: 6, priorN: 7 },
+];
+
+const nutritionMetrics = [
+  { name: "Fat", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
+  { name: "Protein", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
+  { name: "Net Carbs", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
+  { name: "Sodium", value: 0, unit: "mg", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
 ];
 
 const scoreTrend = [
@@ -224,6 +238,7 @@ const weeklyReport = {
   ],
   coreMetrics,
   supportMetrics,
+  nutritionMetrics,
   scoreTrend,
   databricks: {
     ready: true,
@@ -265,7 +280,11 @@ WITH preferences AS (
   SELECT 'Resilience' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Total Sleep' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Heart Rate Variability' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Stress Level' AS metric, 'oura' AS primary_source
+  SELECT 'Stress Level' AS metric, 'oura' AS primary_source UNION ALL
+  SELECT 'Fat' AS metric, 'cronometer' AS primary_source UNION ALL
+  SELECT 'Protein' AS metric, 'cronometer' AS primary_source UNION ALL
+  SELECT 'Net Carbs' AS metric, 'cronometer' AS primary_source UNION ALL
+  SELECT 'Sodium' AS metric, 'cronometer' AS primary_source
 ), anchor AS (
   SELECT max(CAST(dt.date AS DATE)) AS anchor_date
   FROM workspace.default.dailytracker_joined dt
@@ -275,21 +294,39 @@ WITH preferences AS (
     AND dt.metric IN (
       'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
       'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
-      'Heart Rate Variability','Stress Level'
+      'Heart Rate Variability','Stress Level','Fat','Total Fat','Protein','Net Carbs','Net Carbohydrates','Sodium'
     )
 ), ranked AS (
   SELECT
     CONCAT(dt.last_name, ', ', dt.first_name) AS Name,
     CAST(dt.date AS DATE) AS Date,
-    dt.metric,
+    CASE
+      WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
+      WHEN lower(dt.metric) = 'protein' THEN 'Protein'
+      WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
+      WHEN lower(dt.metric) = 'sodium' THEN 'Sodium'
+      ELSE dt.metric
+    END AS metric,
     dt.value,
     dt.source,
     ROW_NUMBER() OVER (
-      PARTITION BY dt.last_name, dt.first_name, CAST(dt.date AS DATE), dt.metric
+      PARTITION BY dt.last_name, dt.first_name, CAST(dt.date AS DATE), CASE
+        WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
+        WHEN lower(dt.metric) = 'protein' THEN 'Protein'
+        WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
+        WHEN lower(dt.metric) = 'sodium' THEN 'Sodium'
+        ELSE dt.metric
+      END
       ORDER BY CASE WHEN prefs.primary_source IS NOT NULL AND dt.source = prefs.primary_source THEN 1 ELSE 2 END
     ) AS rn
   FROM workspace.default.dailytracker_joined dt
-  LEFT JOIN preferences prefs ON dt.metric = prefs.metric
+  LEFT JOIN preferences prefs ON CASE
+    WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
+    WHEN lower(dt.metric) = 'protein' THEN 'Protein'
+    WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
+    WHEN lower(dt.metric) = 'sodium' THEN 'Sodium'
+    ELSE dt.metric
+  END = prefs.metric
   CROSS JOIN anchor a
   WHERE dt.last_name = 'Dodds'
     AND dt.first_name = 'Matthew'
@@ -298,7 +335,7 @@ WITH preferences AS (
     AND dt.metric IN (
     'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
     'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
-    'Heart Rate Variability','Stress Level'
+    'Heart Rate Variability','Stress Level','Fat','Total Fat','Protein','Net Carbs','Net Carbohydrates','Sodium'
   )
 ), dedup AS (
   SELECT * FROM ranked WHERE rn = 1 AND Name = 'Dodds, Matthew'
@@ -340,7 +377,8 @@ ORDER BY CASE metric
   WHEN 'Glucose' THEN 5 WHEN 'Ketones' THEN 6 WHEN 'Insulin Load' THEN 7 WHEN 'Total Sleep' THEN 8
   WHEN 'Sleep Efficiency' THEN 9 WHEN 'Sleep Score' THEN 10 WHEN 'Heart Rate Variability' THEN 11
   WHEN 'Resting HR' THEN 12 WHEN 'Stress Level' THEN 13 WHEN 'Resilience' THEN 14 WHEN 'Steps' THEN 15
-  WHEN 'Vo2max' THEN 16 WHEN 'Calories Burned' THEN 17 WHEN 'Calories Consumed' THEN 18 ELSE 99 END
+  WHEN 'Vo2max' THEN 16 WHEN 'Calories Burned' THEN 17 WHEN 'Calories Consumed' THEN 18
+  WHEN 'Fat' THEN 19 WHEN 'Protein' THEN 20 WHEN 'Net Carbs' THEN 21 WHEN 'Sodium' THEN 22 ELSE 99 END
 `;
 
 type StatementRow = Record<string, string | number | null>;
@@ -446,8 +484,41 @@ function buildReportFromRows(rows: StatementRow[]) {
     })
     .sort((a, b) => metricOrder.indexOf(a.name) - metricOrder.indexOf(b.name));
 
+  const nutrition = rows
+    .filter((row) => nutritionMeta[String(row.metric)])
+    .map((row) => {
+      const name = String(row.metric);
+      const meta = nutritionMeta[name];
+      let dailyValues: Array<Record<string, string | number>> = [];
+      try {
+        dailyValues = typeof row.daily_values === "string" ? JSON.parse(row.daily_values) : [];
+      } catch {
+        dailyValues = [];
+      }
+      const dailyByDate = new Map(dailyValues.map((daily) => [String(daily.date), toNumber(daily.value)]));
+      const anchorDate = String(row.anchor_date ?? row.current_end ?? "");
+      const currentStart = anchorDate ? dateAddDays(anchorDate, -6) : String(row.current_start ?? "");
+      const currentEnd = anchorDate || String(row.current_end ?? "");
+      const filledDailyValues = enumerateDates(currentStart, currentEnd).map((date) => {
+        if (!dailyByDate.has(date)) return { date, value: null, band: "missing", status: "No Data" };
+        return { date, value: toNumber(dailyByDate.get(date)), band: "neutral", status: "Tracked" };
+      });
+      return {
+        name,
+        value: toNumber(row.current_avg),
+        unit: meta.unit,
+        delta: toNumber(row.delta),
+        priorValue: toNumber(row.prior_avg),
+        source: String(row.source ?? "cronometer"),
+        currentN: toNumber(row.current_n),
+        priorN: toNumber(row.prior_n),
+        dailyValues: filledDailyValues,
+      };
+    })
+    .sort((a, b) => ["Fat", "Protein", "Net Carbs", "Sodium"].indexOf(a.name) - ["Fat", "Protein", "Net Carbs", "Sodium"].indexOf(b.name));
+
   const support = rows
-    .filter((row) => !metricMeta[String(row.metric)]?.group)
+    .filter((row) => metricMeta[String(row.metric)] && !metricMeta[String(row.metric)]?.group)
     .map((row) => {
       const name = String(row.metric);
       const meta = metricMeta[name];
@@ -540,6 +611,7 @@ function buildReportFromRows(rows: StatementRow[]) {
     focusAreas,
     coreMetrics: core,
     supportMetrics: support,
+    nutritionMetrics: nutrition,
     databricks: {
       ...weeklyReport.databricks,
       ready: true,
