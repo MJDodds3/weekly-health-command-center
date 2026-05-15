@@ -18,6 +18,7 @@ import {
   Sun,
   Trophy,
   Utensils,
+  Gauge,
 } from "lucide-react";
 import {
   Area,
@@ -130,6 +131,12 @@ type WeeklyReport = {
   coreMetrics: CoreMetric[];
   supportMetrics: SupportMetric[];
   nutritionMetrics?: NutritionMetric[];
+  insulinResistance?: {
+    score: number;
+    range: string;
+    resultDate: string;
+    components: Array<{ metric: string; value: number; score: number }>;
+  };
   scoreTrend: Array<{ date: string; score: number; glucose: number; glucoseIndex: number; sleepScore: number; hrv: number; hrvIndex: number }>;
   databricks: {
     ready: boolean;
@@ -193,6 +200,24 @@ const fallbackReport: WeeklyReport = {
     { name: "Avg Daily Balance", value: -347.71428571, unit: "cal/day", delta: -597.84285715, status: "Deficit", priorValue: 250.12857143, source: "derived", currentN: 6, priorN: 7 },
   ],
   nutritionMetrics: [],
+  insulinResistance: {
+    score: 4,
+    range: "Low",
+    resultDate: "2026-03-31",
+    components: [
+      { metric: "Insulin (Fasting)", value: 2.3, score: 0 },
+      { metric: "Hemoglobin A1c (HbA1c)", value: 5.3, score: 1 },
+      { metric: "Glucose (Fasting)", value: 87, score: 1 },
+      { metric: "Uric Acid", value: 4.2, score: 0 },
+      { metric: "HOMA-IR", value: 0.49, score: 0 },
+      { metric: "Triglycerides (TG)", value: 37, score: 0 },
+      { metric: "HDL Cholesterol", value: 63, score: 0 },
+      { metric: "Trig:HDL ratio", value: 0.59, score: 0 },
+      { metric: "Thyroid Stimulating Hormone (TSH)", value: 1.03, score: 0 },
+      { metric: "LDL:HDL Ratio", value: 1.25, score: 0 },
+      { metric: "Cholesterol:HDL Ratio", value: 2.4, score: 0 },
+    ],
+  },
   scoreTrend: [
     { date: "04-28", score: 82, glucose: 83, glucoseIndex: 91, sleepScore: 80, hrv: 24, hrvIndex: 68 },
     { date: "04-29", score: 84, glucose: 82, glucoseIndex: 92, sleepScore: 82, hrv: 23, hrvIndex: 66 },
@@ -222,6 +247,7 @@ const navItems = [
   { label: "Cardiovascular & Stress", icon: HeartPulse, target: "cardiovascular-stress" },
   { label: "Activity", icon: Activity, target: "activity" },
   { label: "Nutrition", icon: Utensils, target: "nutrition" },
+  { label: "Insulin Resistance", icon: Gauge, target: "insulin-resistance" },
   { label: "Databricks", icon: Database, target: "databricks" },
   { label: "Labs Later", icon: HeartPulse, target: "labs-later" },
 ];
@@ -574,6 +600,63 @@ function NutritionCard({ metrics }: { metrics: NutritionMetric[] }) {
   );
 }
 
+function irScoreClass(score: number) {
+  if (score <= 0) return "border-green-500/30 bg-green-500/10 text-green-300";
+  if (score === 1) return "border-yellow-500/30 bg-yellow-500/10 text-yellow-300";
+  if (score === 2) return "border-orange-500/30 bg-orange-500/10 text-orange-300";
+  return "border-red-500/30 bg-red-500/10 text-red-300";
+}
+
+function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance"] }) {
+  if (!data) return null;
+  const topDrivers = [...data.components].sort((a, b) => b.score - a.score).slice(0, 5);
+  return (
+    <Card id="insulin-resistance" className="scroll-mt-20" data-testid="card-insulin-resistance">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg"><Gauge className="size-5" />Insulin Resistance Score</CardTitle>
+        <p className="text-sm text-muted-foreground">Latest lab-derived IRS score and component drivers from Databricks.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-[0.65fr_1.35fr]">
+          <div className="rounded-md bg-muted p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total score</p>
+            <p className="mt-3 font-mono text-5xl font-semibold text-primary">{data.score}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className={irScoreClass(data.score)}>{data.range || "Range"}</Badge>
+              <Badge variant="secondary">{data.resultDate}</Badge>
+            </div>
+          </div>
+          <div className="rounded-md bg-muted p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Top drivers</p>
+            <div className="mt-3 grid gap-2">
+              {topDrivers.map((item) => (
+                <div key={item.metric} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="truncate">{item.metric}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-muted-foreground">{formatValue(item.value, "")}</span>
+                    <Badge variant="outline" className={irScoreClass(item.score)}>{item.score}</Badge>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {data.components.map((item) => (
+            <div key={item.metric} className="flex items-center justify-between gap-3 rounded-md border border-border/70 p-3 text-sm">
+              <span className="truncate">{item.metric}</span>
+              <span className="flex items-center gap-2">
+                <span className="font-mono text-muted-foreground">{formatValue(item.value, "")}</span>
+                <Badge variant="outline" className={irScoreClass(item.score)}>{item.score}</Badge>
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function DashboardSkeleton() {
   return (
     <div className="grid gap-4 p-4 md:grid-cols-3" data-testid="dashboard-loading">
@@ -876,6 +959,10 @@ function WeeklyDashboard() {
             </Card>
           ))}
           <NutritionCard metrics={data.nutritionMetrics ?? []} />
+        </section>
+
+        <section className="mt-4">
+          <InsulinResistanceCard data={data.insulinResistance} />
         </section>
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">

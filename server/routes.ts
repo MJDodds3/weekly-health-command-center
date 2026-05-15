@@ -204,6 +204,25 @@ const nutritionMetrics = [
   { name: "Net Carbs", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
 ];
 
+const insulinResistanceSnapshot = {
+  score: 4,
+  range: "Low",
+  resultDate: "2026-03-31",
+  components: [
+    { metric: "Insulin (Fasting)", value: 2.3, score: 0 },
+    { metric: "Hemoglobin A1c (HbA1c)", value: 5.3, score: 1 },
+    { metric: "Glucose (Fasting)", value: 87, score: 1 },
+    { metric: "Uric Acid", value: 4.2, score: 0 },
+    { metric: "HOMA-IR", value: 0.49, score: 0 },
+    { metric: "Triglycerides (TG)", value: 37, score: 0 },
+    { metric: "HDL Cholesterol", value: 63, score: 0 },
+    { metric: "Trig:HDL ratio", value: 0.59, score: 0 },
+    { metric: "Thyroid Stimulating Hormone (TSH)", value: 1.03, score: 0 },
+    { metric: "LDL:HDL Ratio", value: 1.25, score: 0 },
+    { metric: "Cholesterol:HDL Ratio", value: 2.4, score: 0 },
+  ],
+};
+
 const scoreTrend = [
   { date: "04-28", score: 82, glucose: 83, glucoseIndex: 91, sleepScore: 80, hrv: 24, hrvIndex: 68 },
   { date: "04-29", score: 84, glucose: 82, glucoseIndex: 92, sleepScore: 82, hrv: 23, hrvIndex: 66 },
@@ -242,6 +261,7 @@ const weeklyReport = {
   coreMetrics,
   supportMetrics,
   nutritionMetrics,
+  insulinResistance: insulinResistanceSnapshot,
   scoreTrend,
   databricks: {
     ready: true,
@@ -710,6 +730,48 @@ async function executeWeeklyMetricsQuery(): Promise<StatementRow[]> {
   return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
 }
 
+async function executeInsulinResistanceQuery() {
+  if (!databricksReady) return insulinResistanceSnapshot;
+  const rows = await executeSql(`
+    WITH latest AS (
+      SELECT max(ResultDate) AS result_date
+      FROM workspace.default.irs_long_latest
+      WHERE lower(LastName) = 'dodds'
+    )
+    SELECT metric, value, Score, IRS_Score, Range_IRS, ResultDate
+    FROM workspace.default.irs_long_latest i
+    CROSS JOIN latest l
+    WHERE lower(i.LastName) = 'dodds'
+      AND i.ResultDate = l.result_date
+      AND i.metric IS NOT NULL
+    ORDER BY CASE metric
+      WHEN 'Insulin (Fasting)' THEN 1
+      WHEN 'Hemoglobin A1c (HbA1c)' THEN 2
+      WHEN 'Glucose (Fasting)' THEN 3
+      WHEN 'Uric Acid' THEN 4
+      WHEN 'HOMA-IR' THEN 5
+      WHEN 'Triglycerides (TG)' THEN 6
+      WHEN 'HDL Cholesterol' THEN 7
+      WHEN 'Trig:HDL ratio' THEN 8
+      WHEN 'Thyroid Stimulating Hormone (TSH)' THEN 9
+      WHEN 'LDL:HDL Ratio' THEN 10
+      WHEN 'Cholesterol:HDL Ratio' THEN 11
+      ELSE 99 END
+  `);
+
+  if (!rows.length) return insulinResistanceSnapshot;
+  return {
+    score: toNumber(rows[0].IRS_Score),
+    range: String(rows[0].Range_IRS ?? ""),
+    resultDate: String(rows[0].ResultDate ?? ""),
+    components: rows.map((row) => ({
+      metric: String(row.metric),
+      value: toNumber(row.value),
+      score: toNumber(row.Score),
+    })),
+  };
+}
+
 async function executeSql(statement: string): Promise<StatementRow[]> {
   const submit = await databricksRequest("/api/2.0/sql/statements", {
     method: "POST",
@@ -774,8 +836,12 @@ export async function refreshWeeklyReport() {
       };
     }
 
-    const rows = await executeWeeklyMetricsQuery();
+    const [rows, insulinResistance] = await Promise.all([
+      executeWeeklyMetricsQuery(),
+      executeInsulinResistanceQuery(),
+    ]);
     const report = buildReportFromRows(rows);
+    report.insulinResistance = insulinResistance;
     cachedRefresh = {
       refreshedAt: Date.now(),
       report,
