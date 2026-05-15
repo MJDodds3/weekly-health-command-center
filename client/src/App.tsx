@@ -362,7 +362,6 @@ const sparklineDomains: Record<string, { min: number; max: number }> = {
   "Fat": { min: 0, max: 250 },
   "Protein": { min: 0, max: 250 },
   "Net Carbs": { min: 0, max: 150 },
-  "Sodium": { min: 0, max: 5000 },
 };
 
 function DailySparkBars({ metric }: { metric: Pick<CoreMetric, "name" | "value" | "unit" | "band" | "status" | "dailyValues"> }) {
@@ -568,7 +567,7 @@ function NutritionCard({ metrics }: { metrics: NutritionMetric[] }) {
             <MacroCaloriePie metrics={metrics} />
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">No Cronometer nutrition rows found for Fat, Protein, Net Carbs, or Sodium in the current window.</p>
+          <p className="text-sm text-muted-foreground">No Cronometer nutrition rows found for Fat, Protein, or Net Carbs in the current window.</p>
         )}
       </CardContent>
     </Card>

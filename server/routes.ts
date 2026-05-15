@@ -47,7 +47,6 @@ const nutritionMeta: Record<string, { unit: string }> = {
   "Fat": { unit: "g" },
   "Protein": { unit: "g" },
   "Net Carbs": { unit: "g" },
-  "Sodium": { unit: "mg" },
 };
 
 type TargetBand = "green" | "yellow" | "red";
@@ -203,7 +202,6 @@ const nutritionMetrics = [
   { name: "Fat", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
   { name: "Protein", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
   { name: "Net Carbs", value: 0, unit: "g", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
-  { name: "Sodium", value: 0, unit: "mg", delta: 0, priorValue: 0, source: "cronometer", currentN: 0, priorN: 0, dailyValues: [] },
 ];
 
 const scoreTrend = [
@@ -334,7 +332,6 @@ WITH nutrition_raw AS (
       WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
       WHEN lower(dt.metric) = 'protein' THEN 'Protein'
       WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
-      WHEN lower(dt.metric) = 'sodium' THEN 'Sodium'
       ELSE dt.metric
     END AS metric,
     dt.value,
@@ -344,7 +341,6 @@ WITH nutrition_raw AS (
         WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
         WHEN lower(dt.metric) = 'protein' THEN 'Protein'
         WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
-        WHEN lower(dt.metric) = 'sodium' THEN 'Sodium'
         ELSE dt.metric
       END
       ORDER BY CASE WHEN prefs.primary_source IS NOT NULL AND dt.source = prefs.primary_source THEN 1 ELSE 2 END
@@ -354,7 +350,6 @@ WITH nutrition_raw AS (
     WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
     WHEN lower(dt.metric) = 'protein' THEN 'Protein'
     WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
-    WHEN lower(dt.metric) = 'sodium' THEN 'Sodium'
     ELSE dt.metric
   END = prefs.metric
   CROSS JOIN anchor a
@@ -420,7 +415,7 @@ ORDER BY CASE metric
   WHEN 'Sleep Efficiency' THEN 9 WHEN 'Sleep Score' THEN 10 WHEN 'Heart Rate Variability' THEN 11
   WHEN 'Resting HR' THEN 12 WHEN 'Stress Level' THEN 13 WHEN 'Resilience' THEN 14 WHEN 'Steps' THEN 15
   WHEN 'Vo2max' THEN 16 WHEN 'Calories Burned' THEN 17 WHEN 'Calories Consumed' THEN 18
-  WHEN 'Fat' THEN 19 WHEN 'Protein' THEN 20 WHEN 'Net Carbs' THEN 21 WHEN 'Sodium' THEN 22 ELSE 99 END
+  WHEN 'Fat' THEN 19 WHEN 'Protein' THEN 20 WHEN 'Net Carbs' THEN 21 ELSE 99 END
 `;
 
 type StatementRow = Record<string, string | number | null>;
@@ -551,6 +546,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         value: toNumber(row.current_avg),
         unit: meta.unit,
         delta: toNumber(row.delta),
+        ...evaluateTarget(name, toNumber(row.current_avg)),
         priorValue: toNumber(row.prior_avg),
         source: String(row.source ?? "cronometer"),
         currentN: toNumber(row.current_n),
@@ -558,7 +554,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         dailyValues: filledDailyValues,
       };
     })
-    .sort((a, b) => ["Fat", "Protein", "Net Carbs", "Sodium"].indexOf(a.name) - ["Fat", "Protein", "Net Carbs", "Sodium"].indexOf(b.name));
+    .sort((a, b) => ["Fat", "Protein", "Net Carbs"].indexOf(a.name) - ["Fat", "Protein", "Net Carbs"].indexOf(b.name));
 
   const support = rows
     .filter((row) => metricMeta[String(row.metric)] && !metricMeta[String(row.metric)]?.group)
