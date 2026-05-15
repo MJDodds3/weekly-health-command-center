@@ -635,7 +635,7 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
             </div>
           </div>
           <div className="rounded-md bg-muted p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Top drivers</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Top Areas of Impact</p>
             <div className="mt-3 grid gap-2">
               {topDrivers.map((item) => (
                 <div key={item.metric} className="flex items-center justify-between gap-3 text-sm">
