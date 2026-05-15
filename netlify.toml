@@ -24,6 +24,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/health/debug/lab-sources"
+  to = "/.netlify/functions/lab-source-search"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

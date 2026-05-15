@@ -832,6 +832,29 @@ export async function searchNutritionSources() {
   `);
 }
 
+export async function searchLabSources() {
+  if (!databricksReady) return [];
+  return executeSql(`
+    SELECT table_catalog, table_schema, table_name, column_name, data_type
+    FROM system.information_schema.columns
+    WHERE lower(table_name) LIKE '%lab%'
+       OR lower(table_name) LIKE '%blood%'
+       OR lower(table_name) LIKE '%irs%'
+       OR lower(table_name) LIKE '%insulin%'
+       OR lower(column_name) LIKE '%component%'
+       OR lower(column_name) LIKE '%metric%'
+       OR lower(column_name) LIKE '%insulin%'
+       OR lower(column_name) LIKE '%hba1c%'
+       OR lower(column_name) LIKE '%glucose%'
+       OR lower(column_name) LIKE '%triglyceride%'
+       OR lower(column_name) LIKE '%hdl%'
+       OR lower(column_name) LIKE '%ldl%'
+       OR lower(column_name) LIKE '%homa%'
+    ORDER BY table_catalog, table_schema, table_name, column_name
+    LIMIT 700
+  `);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
