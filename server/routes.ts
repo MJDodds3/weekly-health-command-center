@@ -206,7 +206,7 @@ const nutritionMetrics = [
 
 const insulinResistanceSnapshot = {
   score: 4,
-  range: "Low",
+  range: "Optimal",
   resultDate: "2026-03-31",
   components: [
     { metric: "Insulin (Fasting)", value: 2.3, score: 0 },
@@ -222,6 +222,14 @@ const insulinResistanceSnapshot = {
     { metric: "Cholesterol:HDL Ratio", value: 2.4, score: 0 },
   ],
 };
+
+function insulinResistanceRange(score: number) {
+  if (score <= 12) return "Optimal";
+  if (score <= 24) return "Mild";
+  if (score <= 35) return "Moderate";
+  if (score <= 50) return "Severe";
+  return "Very Severe";
+}
 
 const scoreTrend = [
   { date: "04-28", score: 82, glucose: 83, glucoseIndex: 91, sleepScore: 80, hrv: 24, hrvIndex: 68 },
@@ -760,9 +768,10 @@ async function executeInsulinResistanceQuery() {
   `);
 
   if (!rows.length) return insulinResistanceSnapshot;
+  const score = toNumber(rows[0].IRS_Score);
   return {
-    score: toNumber(rows[0].IRS_Score),
-    range: String(rows[0].Range_IRS ?? ""),
+    score,
+    range: insulinResistanceRange(score),
     resultDate: String(rows[0].ResultDate ?? ""),
     components: rows.map((row) => ({
       metric: String(row.metric),

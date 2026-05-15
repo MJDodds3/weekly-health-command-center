@@ -602,6 +602,13 @@ function NutritionCard({ metrics }: { metrics: NutritionMetric[] }) {
 }
 
 function irScoreClass(score: number) {
+  if (score <= 12) return "border-green-500/30 bg-green-500/10 text-green-300";
+  if (score <= 24) return "border-yellow-500/30 bg-yellow-500/10 text-yellow-300";
+  if (score <= 35) return "border-orange-500/30 bg-orange-500/10 text-orange-300";
+  return "border-red-500/30 bg-red-500/10 text-red-300";
+}
+
+function irComponentScoreClass(score: number) {
   if (score <= 0) return "border-green-500/30 bg-green-500/10 text-green-300";
   if (score === 1) return "border-yellow-500/30 bg-yellow-500/10 text-yellow-300";
   if (score === 2) return "border-orange-500/30 bg-orange-500/10 text-orange-300";
@@ -635,7 +642,7 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
                   <span className="truncate">{item.metric}</span>
                   <span className="flex items-center gap-2">
                     <span className="font-mono text-muted-foreground">{formatValue(item.value, "")}</span>
-                    <Badge variant="outline" className={irScoreClass(item.score)}>{item.score}</Badge>
+                    <Badge variant="outline" className={irComponentScoreClass(item.score)}>{item.score}</Badge>
                   </span>
                 </div>
               ))}
@@ -648,7 +655,7 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
               <span className="truncate">{item.metric}</span>
               <span className="flex items-center gap-2">
                 <span className="font-mono text-muted-foreground">{formatValue(item.value, "")}</span>
-                <Badge variant="outline" className={irScoreClass(item.score)}>{item.score}</Badge>
+                <Badge variant="outline" className={irComponentScoreClass(item.score)}>{item.score}</Badge>
               </span>
             </div>
           ))}
