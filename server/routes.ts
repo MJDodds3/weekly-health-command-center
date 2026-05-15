@@ -550,10 +550,10 @@ function buildReportFromRows(rows: StatementRow[]) {
     .sort((a, b) => metricOrder.indexOf(a.name) - metricOrder.indexOf(b.name));
 
   const nutrition = rows
-    .filter((row) => nutritionMeta[String(row.metric)])
+    .filter((row) => nutritionMeta[String(row.metric)] || String(row.metric) === "Calories Consumed")
     .map((row) => {
       const name = String(row.metric);
-      const meta = nutritionMeta[name];
+      const meta = nutritionMeta[name] ?? { unit: "cal" };
       let dailyValues: Array<Record<string, string | number>> = [];
       try {
         dailyValues = typeof row.daily_values === "string" ? JSON.parse(row.daily_values) : [];
@@ -582,7 +582,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         dailyValues: filledDailyValues,
       };
     })
-    .sort((a, b) => ["Fat", "Protein", "Net Carbs"].indexOf(a.name) - ["Fat", "Protein", "Net Carbs"].indexOf(b.name));
+    .sort((a, b) => ["Calories Consumed", "Fat", "Protein", "Net Carbs"].indexOf(a.name) - ["Calories Consumed", "Fat", "Protein", "Net Carbs"].indexOf(b.name));
 
   const support = rows
     .filter((row) => metricMeta[String(row.metric)] && !metricMeta[String(row.metric)]?.group)
