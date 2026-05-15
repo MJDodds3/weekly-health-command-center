@@ -746,7 +746,7 @@ async function executeInsulinResistanceQuery() {
       FROM workspace.default.irs_long_latest
       WHERE lower(LastName) = 'dodds'
     ), components AS (
-      SELECT metric, value, Score, IRS_Score, Range_IRS, ResultDate
+      SELECT metric, try_cast(value AS DOUBLE) AS value, Score, IRS_Score, Range_IRS, ResultDate
       FROM workspace.default.irs_long_latest i
       CROSS JOIN latest l
       WHERE lower(i.LastName) = 'dodds'
