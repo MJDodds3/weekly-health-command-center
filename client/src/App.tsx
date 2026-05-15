@@ -969,10 +969,6 @@ function WeeklyDashboard() {
           <NutritionCard metrics={data.nutritionMetrics ?? []} />
         </section>
 
-        <section className="mt-4">
-          <InsulinResistanceCard data={data.insulinResistance} />
-        </section>
-
         <section className="mt-4 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
           <Card data-testid="card-caloric-balance">
             <CardHeader>
@@ -994,7 +990,13 @@ function WeeklyDashboard() {
               ))}
             </CardContent>
           </Card>
+        </section>
 
+        <section className="mt-4">
+          <InsulinResistanceCard data={data.insulinResistance} />
+        </section>
+
+        <section className="mt-4">
           <Card id="databricks" className="scroll-mt-20" data-testid="card-databricks-contract">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div>
