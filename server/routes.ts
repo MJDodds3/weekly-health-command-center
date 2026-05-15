@@ -787,7 +787,7 @@ async function executeInsulinResistanceQuery() {
       ELSE 99 END
   `);
 
-  const ratioRows = await executeSql(`
+  let ratioRows = await executeSql(`
     WITH latest AS (
       SELECT max(ResultDate) AS result_date
       FROM workspace.default.irs_df
@@ -805,6 +805,25 @@ async function executeInsulinResistanceQuery() {
       AND Total_Choloesterol IS NOT NULL
     LIMIT 1
   `).catch(() => []);
+
+  if (!ratioRows.length) {
+    ratioRows = await executeSql(`
+      WITH latest AS (
+        SELECT max(result_date_time) AS result_date
+        FROM workspace.default.labs_irs_pivot
+        WHERE lower(last_name) = 'dodds'
+      )
+      SELECT
+        Cholesterol_HDL_Ratio AS value,
+        Score_ChoHDL AS Score
+      FROM workspace.default.labs_irs_pivot i
+      CROSS JOIN latest l
+      WHERE lower(i.last_name) = 'dodds'
+        AND i.result_date_time = l.result_date
+        AND Cholesterol_HDL_Ratio IS NOT NULL
+      LIMIT 1
+    `).catch(() => []);
+  }
 
   if (!rows.length) return insulinResistanceSnapshot;
   const score = toNumber(rows[0].IRS_Score);
