@@ -788,39 +788,60 @@ async function executeInsulinResistanceQuery() {
   `);
 
   let ratioRows = await executeSql(`
-    WITH latest AS (
-      SELECT max(ResultDate) AS result_date
-      FROM workspace.default.irs_df
-      WHERE lower(LastName) = 'dodds'
-    )
     SELECT
       Total_Choloesterol / HDL_Cholesterol AS value,
       Score_ChoHDL AS Score
     FROM workspace.default.irs_df i
-    CROSS JOIN latest l
     WHERE lower(i.LastName) = 'dodds'
-      AND i.ResultDate = l.result_date
       AND HDL_Cholesterol IS NOT NULL
       AND HDL_Cholesterol != 0
       AND Total_Choloesterol IS NOT NULL
+    ORDER BY ResultDate DESC
     LIMIT 1
   `).catch(() => []);
 
   if (!ratioRows.length) {
     ratioRows = await executeSql(`
-      WITH latest AS (
-        SELECT max(result_date_time) AS result_date
-        FROM workspace.default.labs_irs_pivot
-        WHERE lower(last_name) = 'dodds'
-      )
       SELECT
         Cholesterol_HDL_Ratio AS value,
         Score_ChoHDL AS Score
       FROM workspace.default.labs_irs_pivot i
-      CROSS JOIN latest l
       WHERE lower(i.last_name) = 'dodds'
-        AND i.result_date_time = l.result_date
         AND Cholesterol_HDL_Ratio IS NOT NULL
+      ORDER BY result_date_time DESC
+      LIMIT 1
+    `).catch(() => []);
+  }
+
+  if (!ratioRows.length) {
+    ratioRows = await executeSql(`
+      WITH latest AS (
+        SELECT max(result_date_time) AS result_date
+        FROM workspace.default.labs_joined
+        WHERE lower(last_name) = 'dodds'
+          AND (
+            lower(new_component_name) LIKE '%cholesterol%'
+            OR lower(component_name) LIKE '%cholesterol%'
+          )
+      ), values AS (
+        SELECT
+          max(CASE WHEN lower(new_component_name) LIKE '%total cholesterol%' OR lower(component_name) LIKE '%total cholesterol%' THEN value END) AS total_cholesterol,
+          max(CASE WHEN lower(new_component_name) LIKE '%hdl cholesterol%' OR lower(component_name) LIKE '%hdl cholesterol%' THEN value END) AS hdl
+        FROM workspace.default.labs_joined l
+        CROSS JOIN latest d
+        WHERE lower(l.last_name) = 'dodds'
+          AND l.result_date_time = d.result_date
+      )
+      SELECT
+        total_cholesterol / hdl AS value,
+        CASE WHEN total_cholesterol / hdl <= 4 THEN 0
+             WHEN total_cholesterol / hdl <= 4.5 THEN 1
+             WHEN total_cholesterol / hdl <= 5 THEN 2
+             ELSE 3 END AS Score
+      FROM values
+      WHERE total_cholesterol IS NOT NULL
+        AND hdl IS NOT NULL
+        AND hdl != 0
       LIMIT 1
     `).catch(() => []);
   }
@@ -841,6 +862,19 @@ async function executeInsulinResistanceQuery() {
       value: toNumber(ratioRows[0].value),
       score: toNumber(ratioRows[0].Score),
     });
+  }
+
+  if (!components.some((component) => component.metric === "Cholesterol:HDL Ratio")) {
+    const totalCholesterol = toNumber(rows.find((row) => String(row.metric).toLowerCase().includes("total") && String(row.metric).toLowerCase().includes("cholesterol"))?.value);
+    const hdl = toNumber(rows.find((row) => String(row.metric).toLowerCase().includes("hdl"))?.value);
+    if (totalCholesterol && hdl) {
+      const value = totalCholesterol / hdl;
+      components.splice(10, 0, {
+        metric: "Cholesterol:HDL Ratio",
+        value,
+        score: value <= 4 ? 0 : value <= 4.5 ? 1 : value <= 5 ? 2 : 3,
+      });
+    }
   }
 
   return {
