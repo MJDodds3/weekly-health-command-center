@@ -628,7 +628,7 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
         <div className="grid gap-3 md:grid-cols-[0.65fr_1.35fr]">
           <div className="rounded-md bg-muted p-4">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Total score</p>
-            <p className="mt-3 font-mono text-5xl font-semibold text-primary">{data.score}</p>
+            <p className="mt-3 font-mono text-5xl font-semibold text-primary">{data.score}<span className="text-2xl text-muted-foreground">/54</span></p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge variant="outline" className={irScoreClass(data.score)}>{data.range || "Range"}</Badge>
               <Badge variant="secondary">{data.resultDate}</Badge>
