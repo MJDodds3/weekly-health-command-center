@@ -19,6 +19,7 @@ import {
   Trophy,
   Utensils,
   Gauge,
+  BarChart3,
 } from "lucide-react";
 import {
   Area,
@@ -247,6 +248,7 @@ const navItems = [
   { label: "Cardiovascular & Stress", icon: HeartPulse, target: "cardiovascular-stress" },
   { label: "Activity", icon: Activity, target: "activity" },
   { label: "Nutrition", icon: Utensils, target: "nutrition" },
+  { label: "Caloric Balance", icon: BarChart3, target: "caloric-balance" },
   { label: "Insulin Resistance", icon: Gauge, target: "insulin-resistance" },
   { label: "Databricks", icon: Database, target: "databricks" },
   { label: "Labs Later", icon: HeartPulse, target: "labs-later" },
@@ -970,9 +972,9 @@ function WeeklyDashboard() {
         </section>
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-          <Card data-testid="card-caloric-balance">
+          <Card id="caloric-balance" className="scroll-mt-20" data-testid="card-caloric-balance">
             <CardHeader>
-              <CardTitle className="text-lg">Caloric balance context</CardTitle>
+              <CardTitle className="text-lg">Caloric Balance</CardTitle>
               <p className="text-sm text-muted-foreground">Supporting metrics outside the 16 core tracking metrics.</p>
             </CardHeader>
             <CardContent className="space-y-3">
