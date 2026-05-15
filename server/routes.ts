@@ -745,13 +745,33 @@ async function executeInsulinResistanceQuery() {
       SELECT max(ResultDate) AS result_date
       FROM workspace.default.irs_long_latest
       WHERE lower(LastName) = 'dodds'
+    ), components AS (
+      SELECT metric, value, Score, IRS_Score, Range_IRS, ResultDate
+      FROM workspace.default.irs_long_latest i
+      CROSS JOIN latest l
+      WHERE lower(i.LastName) = 'dodds'
+        AND i.ResultDate = l.result_date
+        AND i.metric IS NOT NULL
+
+      UNION ALL
+
+      SELECT
+        'Cholesterol:HDL Ratio' AS metric,
+        Total_Choloesterol / HDL_Cholesterol AS value,
+        Score_ChoHDL AS Score,
+        IRS_Score,
+        Range_IRS,
+        ResultDate
+      FROM workspace.default.irs_df i
+      CROSS JOIN latest l
+      WHERE lower(i.LastName) = 'dodds'
+        AND i.ResultDate = l.result_date
+        AND HDL_Cholesterol IS NOT NULL
+        AND HDL_Cholesterol != 0
+        AND Total_Choloesterol IS NOT NULL
     )
     SELECT metric, value, Score, IRS_Score, Range_IRS, ResultDate
-    FROM workspace.default.irs_long_latest i
-    CROSS JOIN latest l
-    WHERE lower(i.LastName) = 'dodds'
-      AND i.ResultDate = l.result_date
-      AND i.metric IS NOT NULL
+    FROM components
     ORDER BY CASE metric
       WHEN 'Insulin (Fasting)' THEN 1
       WHEN 'Hemoglobin A1c (HbA1c)' THEN 2
@@ -773,7 +793,9 @@ async function executeInsulinResistanceQuery() {
     score,
     range: insulinResistanceRange(score),
     resultDate: String(rows[0].ResultDate ?? ""),
-    components: rows.map((row) => ({
+    components: rows
+    .filter((row, index, all) => all.findIndex((candidate) => candidate.metric === row.metric) === index)
+    .map((row) => ({
       metric: String(row.metric),
       value: toNumber(row.value),
       score: toNumber(row.Score),
