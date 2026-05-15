@@ -28,6 +28,8 @@ import {
   Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -490,6 +492,75 @@ function NutritionRow({ metric }: { metric: NutritionMetric }) {
   );
 }
 
+function MacroCaloriePie({ metrics }: { metrics: NutritionMetric[] }) {
+  const fat = metrics.find((metric) => metric.name === "Fat")?.value ?? 0;
+  const protein = metrics.find((metric) => metric.name === "Protein")?.value ?? 0;
+  const netCarbs = metrics.find((metric) => metric.name === "Net Carbs")?.value ?? 0;
+  const data = [
+    { name: "Fat", calories: fat * 9, color: chartColors.orange },
+    { name: "Protein", calories: protein * 4, color: chartColors.teal },
+    { name: "Net Carbs", calories: netCarbs * 4, color: chartColors.blue },
+  ].filter((item) => item.calories > 0);
+  const total = data.reduce((sum, item) => sum + item.calories, 0);
+
+  if (!total) return null;
+
+  return (
+    <div className="mt-5 rounded-md bg-muted p-4" data-testid="chart-macro-calories">
+      <div className="mb-3">
+        <p className="text-sm font-semibold">Macro calorie split</p>
+        <p className="text-xs text-muted-foreground">Calculated as fat × 9, protein × 4, net carbs × 4.</p>
+      </div>
+      <div className="grid items-center gap-3 md:grid-cols-[0.8fr_1fr]">
+        <div className="h-40">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} dataKey="calories" nameKey="name" innerRadius={42} outerRadius={68} paddingAngle={2}>
+                {data.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+              </Pie>
+              <Tooltip
+                formatter={(value: number, name: string) => [`${Math.round(value).toLocaleString()} cal`, name]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="space-y-2">
+          {data.map((item) => (
+            <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
+              <span className="flex items-center gap-2">
+                <i className="block size-2 rounded-full" style={{ backgroundColor: item.color }} />
+                {item.name}
+              </span>
+              <span className="font-mono">{Math.round((item.calories / total) * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NutritionCard({ metrics }: { metrics: NutritionMetric[] }) {
+  return (
+    <Card id="nutrition" className="scroll-mt-20" data-testid="card-nutrition">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg"><Utensils className="size-5" />Nutrition</CardTitle>
+        <p className="text-sm text-muted-foreground">Daily Cronometer macros. These are tracked but not scored until target ranges are defined.</p>
+      </CardHeader>
+      <CardContent>
+        {metrics.length ? (
+          <>
+            {metrics.map((metric) => <NutritionRow key={metric.name} metric={metric} />)}
+            <MacroCaloriePie metrics={metrics} />
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No Cronometer nutrition rows found for Fat, Protein, Net Carbs, or Sodium in the current window.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DashboardSkeleton() {
   return (
     <div className="grid gap-4 p-4 md:grid-cols-3" data-testid="dashboard-loading">
@@ -782,7 +853,7 @@ function WeeklyDashboard() {
             >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  {group === "Body Composition" ? <Scale className="size-5" /> : group === "Metabolic Health" ? <Droplets className="size-5" /> : group === "Sleep" ? <Moon className="size-5" /> : group === "Cardiovascular & Stress" ? <HeartPulse className="size-5" /> : <Utensils className="size-5" />}
+                  {group === "Body Composition" ? <Scale className="size-5" /> : group === "Metabolic Health" ? <Droplets className="size-5" /> : group === "Sleep" ? <Moon className="size-5" /> : group === "Cardiovascular & Stress" ? <HeartPulse className="size-5" /> : <Activity className="size-5" />}
                   {group}
                 </CardTitle>
               </CardHeader>
@@ -791,22 +862,7 @@ function WeeklyDashboard() {
               </CardContent>
             </Card>
           ))}
-        </section>
-
-        <section id="nutrition" className="scroll-mt-20 mt-4">
-          <Card data-testid="card-nutrition">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Utensils className="size-5" />Nutrition</CardTitle>
-              <p className="text-sm text-muted-foreground">Daily Cronometer macros and sodium. These are tracked but not scored until target ranges are defined.</p>
-            </CardHeader>
-            <CardContent>
-              {(data.nutritionMetrics ?? []).length ? (
-                data.nutritionMetrics?.map((metric) => <NutritionRow key={metric.name} metric={metric} />)
-              ) : (
-                <p className="text-sm text-muted-foreground">No Cronometer nutrition rows found for Fat, Protein, Net Carbs, or Sodium in the current window.</p>
-              )}
-            </CardContent>
-          </Card>
+          <NutritionCard metrics={data.nutritionMetrics ?? []} />
         </section>
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
