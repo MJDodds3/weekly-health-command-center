@@ -335,7 +335,8 @@ function ThemeToggle() {
   );
 }
 
-function formatValue(value: number, unit: string) {
+function formatValue(value: number | null | undefined, unit: string) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
   const rounded = Math.abs(value) >= 100 || unit === "cal" || unit === "steps" ? Math.round(value) : Math.abs(value) < 1 ? Number(value.toFixed(2)) : Number(value.toFixed(1));
   const formatted = Math.abs(rounded) >= 1000 ? rounded.toLocaleString() : Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(Math.abs(rounded) < 1 ? 2 : 1);
   return `${formatted}${unit ? ` ${unit}` : ""}`;
