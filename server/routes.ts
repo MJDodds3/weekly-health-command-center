@@ -73,6 +73,11 @@ const mjdRanges: Record<string, {
   "Resilience": { green: ">4", yellow: "2-4", red: "<2" },
   "Steps": { green: ">10000", yellow: "7000-10000", red: "<7000" },
   "Vo2max": { green: ">45", yellow: "35-45", red: "<35" },
+  "Calories Consumed": { green: "<2500", yellow: "2500-3000", red: ">3000" },
+  "Fat": { green: ">200", yellow: "100-200", red: "<100" },
+  "Protein": { green: "<100", yellow: "100-175", red: ">175" },
+  "Net Carbs": { green: "<20", yellow: "20-50", red: ">50" },
+  "% Calories from Fat": { green: ">0.8", yellow: "0.6-0.8", red: "<0.6" },
 };
 
 function matchesRange(value: number, expression: string): boolean {
@@ -190,7 +195,7 @@ const coreMetrics = [
 
 const supportMetrics = [
   { name: "Calories Burned", value: 2883.28571429, unit: "cal", delta: -62.28571429, status: "On Target", band: "green", priorValue: 2945.57142857, source: "oura", currentN: 7, priorN: 7 },
-  { name: "Calories Consumed", value: 3231, unit: "cal", delta: 535.55714286, status: "Above Target", band: "red", priorValue: 2695.44285714, source: "cronometer", currentN: 6, priorN: 7 },
+  { name: "Calories Consumed", value: 3231, unit: "cal", delta: 535.55714286, ...evaluateTarget("Calories Consumed", 3231), priorValue: 2695.44285714, source: "cronometer", currentN: 6, priorN: 7 },
   { name: "Avg Daily Balance", value: -347.71428571, unit: "cal/day", delta: -597.84285715, status: "Deficit", priorValue: 250.12857143, source: "derived", currentN: 6, priorN: 7 },
 ];
 
@@ -538,7 +543,8 @@ function buildReportFromRows(rows: StatementRow[]) {
       const currentEnd = anchorDate || String(row.current_end ?? "");
       const filledDailyValues = enumerateDates(currentStart, currentEnd).map((date) => {
         if (!dailyByDate.has(date)) return { date, value: null, band: "missing", status: "No Data" };
-        return { date, value: toNumber(dailyByDate.get(date)), band: "neutral", status: "Tracked" };
+        const value = toNumber(dailyByDate.get(date));
+        return { date, value, ...evaluateTarget(name, value) };
       });
       return {
         name,
@@ -564,8 +570,7 @@ function buildReportFromRows(rows: StatementRow[]) {
         value: toNumber(row.current_avg),
         unit: meta.unit,
         delta: toNumber(row.delta),
-        status: meta.status,
-        band: meta.direction === "warning" ? "red" : "green",
+        ...evaluateTarget(name, toNumber(row.current_avg)),
         priorValue: toNumber(row.prior_avg),
         source: String(row.source ?? ""),
         currentN: toNumber(row.current_n),
@@ -589,7 +594,7 @@ function buildReportFromRows(rows: StatementRow[]) {
       source: "derived",
       currentN: Math.min(caloriesBurned.currentN, caloriesConsumed.currentN),
       priorN: Math.min(caloriesBurned.priorN, caloriesConsumed.priorN),
-    });
+    } as any);
   }
 
   const currentStart = String(rows[0]?.current_start ?? "2026-04-28");

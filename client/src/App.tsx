@@ -103,6 +103,8 @@ type NutritionMetric = {
   unit: string;
   delta: number;
   priorValue: number;
+  status?: string;
+  band?: "green" | "yellow" | "red" | "missing" | "neutral";
   source?: string;
   currentN?: number;
   priorN?: number;
@@ -469,6 +471,8 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
 }
 
 function NutritionRow({ metric }: { metric: NutritionMetric }) {
+  const status = metric.status ?? "Tracked";
+  const band = metric.band ?? "neutral";
   return (
     <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-b border-border/70 py-3 last:border-0 md:grid-cols-[1.1fr_0.8fr_0.7fr_0.9fr] md:gap-3" data-testid={`row-nutrition-${metric.name.toLowerCase().replaceAll(" ", "-")}`}>
       <div className="min-w-0">
@@ -483,9 +487,9 @@ function NutritionRow({ metric }: { metric: NutritionMetric }) {
         {formatDelta(metric.delta)}
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-300">Tracked</Badge>
+        <Badge variant="outline" className={statusClass(status, band)}>{status}</Badge>
         <div className="w-16">
-          <DailySparkBars metric={{ ...metric, band: "neutral", status: "Tracked" }} />
+          <DailySparkBars metric={{ ...metric, band, status }} />
         </div>
       </div>
     </div>
@@ -502,14 +506,24 @@ function MacroCaloriePie({ metrics }: { metrics: NutritionMetric[] }) {
     { name: "Net Carbs", calories: netCarbs * 4, color: chartColors.blue },
   ].filter((item) => item.calories > 0);
   const total = data.reduce((sum, item) => sum + item.calories, 0);
+  const fatPercent = total ? (fat * 9) / total : 0;
+  const fatBand = fatPercent > 0.8 ? "green" : fatPercent >= 0.6 ? "yellow" : "red";
+  const fatStatus = fatPercent > 0.8 ? "Above Target" : fatPercent >= 0.6 ? "On Target" : "Below Target";
 
   if (!total) return null;
 
   return (
     <div className="mt-5 rounded-md bg-muted p-4" data-testid="chart-macro-calories">
       <div className="mb-3">
-        <p className="text-sm font-semibold">Macro calorie split</p>
-        <p className="text-xs text-muted-foreground">Calculated as fat × 9, protein × 4, net carbs × 4.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Macro calorie split</p>
+            <p className="text-xs text-muted-foreground">Calculated as fat × 9, protein × 4, net carbs × 4.</p>
+          </div>
+          <Badge variant="outline" className={statusClass(fatStatus, fatBand)}>
+            Fat {Math.round(fatPercent * 100)}%
+          </Badge>
+        </div>
       </div>
       <div className="grid items-center gap-3 md:grid-cols-[0.8fr_1fr]">
         <div className="h-40">
