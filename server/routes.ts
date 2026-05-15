@@ -787,19 +787,48 @@ async function executeInsulinResistanceQuery() {
       ELSE 99 END
   `);
 
+  const ratioRows = await executeSql(`
+    WITH latest AS (
+      SELECT max(ResultDate) AS result_date
+      FROM workspace.default.irs_df
+      WHERE lower(LastName) = 'dodds'
+    )
+    SELECT
+      Total_Choloesterol / HDL_Cholesterol AS value,
+      Score_ChoHDL AS Score
+    FROM workspace.default.irs_df i
+    CROSS JOIN latest l
+    WHERE lower(i.LastName) = 'dodds'
+      AND i.ResultDate = l.result_date
+      AND HDL_Cholesterol IS NOT NULL
+      AND HDL_Cholesterol != 0
+      AND Total_Choloesterol IS NOT NULL
+    LIMIT 1
+  `).catch(() => []);
+
   if (!rows.length) return insulinResistanceSnapshot;
   const score = toNumber(rows[0].IRS_Score);
-  return {
-    score,
-    range: insulinResistanceRange(score),
-    resultDate: String(rows[0].ResultDate ?? ""),
-    components: rows
+  const components = rows
     .filter((row, index, all) => all.findIndex((candidate) => candidate.metric === row.metric) === index)
     .map((row) => ({
       metric: String(row.metric),
       value: toNumber(row.value),
       score: toNumber(row.Score),
-    })),
+    }));
+
+  if (!components.some((component) => component.metric === "Cholesterol:HDL Ratio") && ratioRows.length) {
+    components.splice(10, 0, {
+      metric: "Cholesterol:HDL Ratio",
+      value: toNumber(ratioRows[0].value),
+      score: toNumber(ratioRows[0].Score),
+    });
+  }
+
+  return {
+    score,
+    range: insulinResistanceRange(score),
+    resultDate: String(rows[0].ResultDate ?? ""),
+    components,
   };
 }
 
