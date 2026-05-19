@@ -64,3 +64,17 @@ LIVE_OVERVIEW=false
 ```
 
 The default live overview behavior is more current across devices, but can increase Databricks query frequency. Keep the query cache and warehouse auto-stop settings in place to control cost.
+
+## IRS v2 override
+
+The dashboard currently uses the updated IRS v2 definition from the data dictionary while Databricks is being updated upstream.
+
+```bash
+USE_DD_IRS_V2=true
+```
+
+This is the default. To switch back to Databricks' live `irs_long_latest` score after the upstream model is updated, set:
+
+```bash
+USE_DD_IRS_V2=false
+```

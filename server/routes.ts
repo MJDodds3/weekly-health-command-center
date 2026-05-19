@@ -205,23 +205,32 @@ const nutritionMetrics = [
 ];
 
 const insulinResistanceSnapshot = {
-  score: 4,
+  score: 7,
   range: "Optimal",
-  resultDate: "2026-03-31",
+  resultDate: "1Q26",
   components: [
-    { metric: "Insulin (Fasting)", value: 2.3, score: 0 },
+    { metric: "Alanine Aminotransferase (ALT)", value: 14, score: 0 },
+    { metric: "Apolipoprotein B (Apo-B)", value: 103, score: 2 },
+    { metric: "Glucose (Fasting)", value: 98, score: 2 },
+    { metric: "Diastolic Blood Pressure", value: 85, score: 0 },
+    { metric: "Body Fat (%) - Male", value: 11, score: 0 },
+    { metric: "Cortisol (AM, Serum)", value: 10.6, score: 0 },
     { metric: "Hemoglobin A1c (HbA1c)", value: 5.3, score: 1 },
-    { metric: "Glucose (Fasting)", value: 87, score: 1 },
-    { metric: "Uric Acid", value: 4.2, score: 0 },
-    { metric: "HOMA-IR", value: 0.49, score: 0 },
-    { metric: "Triglycerides (TG)", value: 37, score: 0 },
-    { metric: "HDL Cholesterol", value: 63, score: 0 },
-    { metric: "Trig:HDL ratio", value: 0.59, score: 0 },
-    { metric: "Thyroid Stimulating Hormone (TSH)", value: 1.03, score: 0 },
-    { metric: "LDL:HDL Ratio", value: 1.25, score: 0 },
-    { metric: "Cholesterol:HDL Ratio", value: 2.4, score: 0 },
+    { metric: "HDL Cholesterol", value: 65, score: 0 },
+    { metric: "HOMA-IR", value: 1.4, score: 1 },
+    { metric: "hs-CRP", value: 0.3, score: 0 },
+    { metric: "Insulin (Fasting)", value: 5.7, score: 1 },
+    { metric: "LDL:HDL Ratio", value: 1.85, score: 0 },
+    { metric: "Thyroid Stimulating Hormone (TSH)", value: 0.92, score: 0 },
+    { metric: "Cholesterol:HDL Ratio", value: 2.7, score: 0 },
+    { metric: "Trig:HDL ratio", value: 0.78, score: 0 },
+    { metric: "Triglycerides (TG)", value: 51, score: 0 },
+    { metric: "Uric Acid", value: 2.7, score: 0 },
+    { metric: "Waist:Height", value: 0.46, score: 0 },
   ],
 };
+
+const useDataDictionaryIRS = process.env.USE_DD_IRS_V2 !== "false";
 
 function insulinResistanceRange(score: number) {
   if (score <= 12) return "Optimal";
@@ -740,6 +749,7 @@ async function executeWeeklyMetricsQuery(): Promise<StatementRow[]> {
 
 async function executeInsulinResistanceQuery() {
   if (!databricksReady) return insulinResistanceSnapshot;
+  if (useDataDictionaryIRS) return insulinResistanceSnapshot;
   const rows = await executeSql(`
     WITH latest AS (
       SELECT max(ResultDate) AS result_date
