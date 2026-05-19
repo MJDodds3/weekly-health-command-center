@@ -751,6 +751,8 @@ function WeeklyDashboard() {
 
   const totalWeight = useMemo(() => scoreByGroup.reduce((sum, item) => sum + item.weight, 0), [scoreByGroup]);
   const totalContribution = useMemo(() => Number(scoreByGroup.reduce((sum, item) => sum + item.contribution, 0).toFixed(1)), [scoreByGroup]);
+  const displayedScore = Math.round(totalContribution);
+  const displayedScoreBand = displayedScore >= 90 ? "Optimal" : displayedScore >= 75 ? "Good" : "Needs Work";
   const databricksStatus = data?.mode.includes("live")
     ? "Databricks live"
     : data?.mode.includes("export") || data?.mode.includes("snapshot")
@@ -850,11 +852,11 @@ function WeeklyDashboard() {
                     <h2 className="mt-3 text-lg font-semibold md:text-xl">Weekly Health Report</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{data.person} · {data.displayedRange}</p>
                   </div>
-                  <Badge variant="outline" className="border-primary/40 text-primary">{data.scoreBand}</Badge>
+                  <Badge variant="outline" className="border-primary/40 text-primary">{displayedScoreBand}</Badge>
                 </div>
                 <div className="mt-6 flex items-end justify-between gap-5 md:mt-8">
                   <div>
-                    <p className="font-mono text-5xl font-semibold leading-none text-primary md:text-6xl">{data.score}</p>
+                    <p className="font-mono text-5xl font-semibold leading-none text-primary md:text-6xl">{displayedScore}</p>
                     <p className="mt-2 text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">Weekly Health Score</p>
                   </div>
                   <div className="text-right">
@@ -863,7 +865,7 @@ function WeeklyDashboard() {
                   </div>
                 </div>
                 <div className="mt-6">
-                  <Progress value={data.score} />
+                  <Progress value={displayedScore} />
                   <div className="mt-2 flex justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
                     <span>Needs Work</span><span>Good</span><span>Optimal</span>
                   </div>
@@ -959,7 +961,7 @@ function WeeklyDashboard() {
               </ResponsiveContainer>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                The rounded dashboard score is {data.score}; underlying weighted points are {totalContribution}/100.
+                The rounded dashboard score is {displayedScore}; underlying weighted points are {totalContribution}/100.
               </p>
             </CardContent>
           </Card>
