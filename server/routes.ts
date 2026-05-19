@@ -380,7 +380,9 @@ WITH nutrition_raw AS (
         WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
         ELSE dt.metric
       END
-      ORDER BY CASE WHEN prefs.primary_source IS NOT NULL AND dt.source = prefs.primary_source THEN 1 ELSE 2 END
+      ORDER BY
+        CASE WHEN prefs.primary_source IS NOT NULL AND dt.source = prefs.primary_source THEN 1 ELSE 2 END,
+        CASE WHEN dt.metric = 'Steps' THEN dt.value ELSE NULL END DESC
     ) AS rn
   FROM workspace.default.dailytracker_joined dt
   LEFT JOIN preferences prefs ON CASE
