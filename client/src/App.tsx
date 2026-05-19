@@ -394,6 +394,7 @@ const sparklineDomains: Record<string, { min: number; max: number }> = {
 };
 
 function DailySparkBars({ metric }: { metric: Pick<CoreMetric, "name" | "value" | "unit" | "band" | "status" | "dailyValues"> }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const values = metric.dailyValues ?? [];
   const displayValues = values.length ? values : Array.from({ length: 7 }, (_, index) => ({
     date: `D${index + 1}`,
@@ -402,9 +403,27 @@ function DailySparkBars({ metric }: { metric: Pick<CoreMetric, "name" | "value" 
     status: metric.status,
   }));
   const domain = sparklineDomains[metric.name];
+  const activeItem = activeIndex !== null ? displayValues[activeIndex] : null;
+
+  function formatSparkDate(date: string) {
+    if (!date || date.startsWith("D")) return date;
+    const parsed = new Date(`${date}T00:00:00Z`);
+    return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  }
 
   return (
-    <div className="flex h-8 items-end justify-end gap-1" title="Current 7-day daily values">
+    <div className="relative flex h-8 items-end justify-end gap-1" aria-label={`${metric.name} current 7-day daily values`}>
+      {activeItem ? (
+        <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 min-w-36 rounded-md border border-border bg-popover px-3 py-2 text-left text-xs shadow-lg">
+          <p className="font-medium">{formatSparkDate(activeItem.date)}</p>
+          <p className="mt-1 font-mono text-sm">
+            {activeItem.value === null ? "No data" : formatValue(activeItem.value, metric.unit)}
+          </p>
+          <p className={`mt-1 ${activeItem.band === "green" ? "text-green-300" : activeItem.band === "yellow" ? "text-yellow-300" : activeItem.band === "red" ? "text-red-300" : "text-muted-foreground"}`}>
+            {activeItem.status ?? metric.status}
+          </p>
+        </div>
+      ) : null}
       {displayValues.map((item, index) => {
         const value = item.value ?? domain?.min ?? 0;
         const normalized = item.value === null
@@ -416,9 +435,15 @@ function DailySparkBars({ metric }: { metric: Pick<CoreMetric, "name" | "value" 
         return (
           <span
             key={`${item.date}-${index}`}
-            className={`w-1.5 rounded-sm ${barColor(item.band)}`}
+            role="button"
+            tabIndex={0}
+            className={`w-2 rounded-sm outline-none ring-offset-2 ring-offset-background transition-all hover:opacity-80 focus:ring-2 focus:ring-primary ${activeIndex === index ? "opacity-100" : "opacity-90"} ${barColor(item.band)}`}
             style={{ height: `${height}%` }}
-            title={item.value === null ? `${item.date}: No data` : `${item.date}: ${formatValue(item.value, metric.unit)} · ${item.status ?? metric.status}`}
+            onMouseEnter={() => setActiveIndex(index)}
+            onMouseLeave={() => setActiveIndex(null)}
+            onFocus={() => setActiveIndex(index)}
+            onBlur={() => setActiveIndex(null)}
+            onClick={() => setActiveIndex(activeIndex === index ? null : index)}
             aria-label={item.value === null ? `${metric.name} ${item.date}: No data` : `${metric.name} ${item.date}: ${formatValue(item.value, metric.unit)}`}
           />
         );
