@@ -708,6 +708,9 @@ function WeeklyDashboard() {
     return Array.from(groups.entries());
   }, [data]);
 
+  const activityGroup = useMemo(() => grouped.find(([group]) => group === "Activity"), [grouped]);
+  const primaryMetricGroups = useMemo(() => grouped.filter(([group]) => group !== "Activity"), [grouped]);
+
   const scoreByGroup = useMemo(() => {
     return grouped.map(([group, metrics]) => {
       const weight = categoryWeights[group] ?? 0;
@@ -938,7 +941,7 @@ function WeeklyDashboard() {
         </section>
 
         <section className="mt-4 grid gap-4 xl:grid-cols-2">
-          {grouped.map(([group, metrics]) => (
+          {primaryMetricGroups.map(([group, metrics]) => (
             <Card
               key={group}
               id={
@@ -959,7 +962,7 @@ function WeeklyDashboard() {
             >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  {group === "Body Composition" ? <Scale className="size-5" /> : group === "Metabolic Health" ? <Droplets className="size-5" /> : group === "Sleep" ? <Moon className="size-5" /> : group === "Cardiovascular & Stress" ? <HeartPulse className="size-5" /> : <Activity className="size-5" />}
+              {group === "Body Composition" ? <Scale className="size-5" /> : group === "Metabolic Health" ? <Droplets className="size-5" /> : group === "Sleep" ? <Moon className="size-5" /> : group === "Cardiovascular & Stress" ? <HeartPulse className="size-5" /> : <Activity className="size-5" />}
                   {group}
                 </CardTitle>
               </CardHeader>
@@ -968,30 +971,49 @@ function WeeklyDashboard() {
               </CardContent>
             </Card>
           ))}
-          <NutritionCard metrics={data.nutritionMetrics ?? []} />
         </section>
 
-        <section className="mt-4 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-          <Card id="caloric-balance" className="scroll-mt-20" data-testid="card-caloric-balance">
-            <CardHeader>
-              <CardTitle className="text-lg">Caloric Balance</CardTitle>
-              <p className="text-sm text-muted-foreground">Supporting metrics outside the 16 core tracking metrics.</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.supportMetrics.map((metric) => (
-                <div key={metric.name} className="flex items-center justify-between gap-3 rounded-md bg-muted p-3">
-                  <div>
-                    <p className="text-sm font-medium">{metric.name}</p>
-                    <p className="text-xs text-muted-foreground">{metric.status}</p>
+        <section className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4">
+            {activityGroup ? (
+              <Card
+                id="activity"
+                className="scroll-mt-20"
+                data-testid="card-group-activity"
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Activity className="size-5" />
+                    Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activityGroup[1].map((metric) => <MetricRow key={metric.name} metric={metric} />)}
+                </CardContent>
+              </Card>
+            ) : null}
+            <Card id="caloric-balance" className="scroll-mt-20" data-testid="card-caloric-balance">
+              <CardHeader>
+                <CardTitle className="text-lg">Caloric Balance</CardTitle>
+                <p className="text-sm text-muted-foreground">Supporting metrics outside the 16 core tracking metrics.</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {data.supportMetrics.map((metric) => (
+                  <div key={metric.name} className="flex items-center justify-between gap-3 rounded-md bg-muted p-3">
+                    <div>
+                      <p className="text-sm font-medium">{metric.name}</p>
+                      <p className="text-xs text-muted-foreground">{metric.status}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono font-semibold">{formatValue(metric.value, metric.unit)}</p>
+                      {metric.delta !== null ? <p className="font-mono text-xs text-muted-foreground">{formatDelta(metric.delta)} vs prior</p> : null}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono font-semibold">{formatValue(metric.value, metric.unit)}</p>
-                    {metric.delta !== null ? <p className="font-mono text-xs text-muted-foreground">{formatDelta(metric.delta)} vs prior</p> : null}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+          <NutritionCard metrics={data.nutritionMetrics ?? []} />
         </section>
 
         <section className="mt-4">
