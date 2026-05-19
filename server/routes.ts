@@ -174,7 +174,7 @@ const coreMetrics = [
   { group: "Cardiovascular & Stress", name: "Resting HR", value: 73.85714286, unit: "bpm", delta: -0.42857143, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 74.28571429, source: "oura", currentN: 7, priorN: 7 },
   { group: "Cardiovascular & Stress", name: "Stress Level", value: 2.16666667, unit: "", delta: -0.11904762, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 2.28571429, source: "oura", currentN: 6, priorN: 7 },
   { group: "Cardiovascular & Stress", name: "Resilience", value: 3.71428571, unit: "", delta: 0, status: "On Target", direction: "neutral", scoreImpact: 5, priorValue: 3.71428571, source: "oura", currentN: 7, priorN: 7 },
-  { group: "Activity", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "oura", currentN: 7, priorN: 7 },
+  { group: "Activity", name: "Steps", value: 10657, unit: "steps", delta: -598, status: "Above Target", direction: "warning", scoreImpact: 3, priorValue: 11255, source: "healthkit2", currentN: 7, priorN: 7 },
   { group: "Activity", name: "Vo2max", value: 44, unit: "ml/kg/min", delta: 0.5, status: "On Target", direction: "positive", scoreImpact: 5, priorValue: 43.5, source: "oura", currentN: 6, priorN: 6 },
 ].map((metric) => {
   const target = evaluateTarget(metric.name, metric.value);
@@ -333,7 +333,7 @@ WITH nutrition_raw AS (
   SELECT 'Glucose' AS metric, 'healthkit2' AS primary_source UNION ALL
   SELECT 'Ketones' AS metric, 'mymojohealth' AS primary_source UNION ALL
   SELECT 'Calories Burned' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Steps' AS metric, 'oura' AS primary_source UNION ALL
+  SELECT 'Steps' AS metric, 'healthkit2' AS primary_source UNION ALL
   SELECT 'Vo2max' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Sleep Score' AS metric, 'oura' AS primary_source UNION ALL
   SELECT 'Sleep Efficiency' AS metric, 'oura' AS primary_source UNION ALL
