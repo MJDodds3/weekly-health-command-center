@@ -420,7 +420,7 @@ WITH nutrition_raw AS (
     d.*,
     a.anchor_date,
     CASE
-      WHEN d.metric IN ('Fat','Protein','Net Carbs','Calories Consumed') THEN
+      WHEN d.metric IN ('Fat','Protein','Net Carbs','Calories Consumed','Calories Burned') THEN
         CASE
           WHEN d.Date > date_sub(a.anchor_date, 8) AND d.Date <= date_sub(a.anchor_date, 1) THEN 'current_7d'
           WHEN d.Date > date_sub(a.anchor_date, 15) AND d.Date <= date_sub(a.anchor_date, 8) THEN 'prior_7d'
