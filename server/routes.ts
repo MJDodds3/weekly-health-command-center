@@ -394,7 +394,7 @@ WITH nutrition_raw AS (
   CROSS JOIN anchor a
   WHERE dt.last_name = 'Dodds'
     AND dt.first_name = 'Matthew'
-    AND CAST(dt.date AS DATE) > date_sub(a.anchor_date, 14)
+    AND CAST(dt.date AS DATE) > date_sub(a.anchor_date, 15)
     AND CAST(dt.date AS DATE) <= a.anchor_date
     AND dt.metric IN (
     'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
@@ -411,8 +411,8 @@ WITH nutrition_raw AS (
     1 AS rn
   FROM nutrition_long n
   CROSS JOIN anchor a
-  WHERE n.Date > date_sub(a.anchor_date, 14)
-    AND n.Date <= a.anchor_date
+  WHERE n.Date > date_sub(a.anchor_date, 15)
+    AND n.Date <= date_sub(a.anchor_date, 1)
 ), dedup AS (
   SELECT * FROM ranked WHERE rn = 1 AND Name = 'Dodds, Matthew'
 ), windows AS (
@@ -420,9 +420,18 @@ WITH nutrition_raw AS (
     d.*,
     a.anchor_date,
     CASE
-      WHEN d.Date > date_sub(a.anchor_date, 7) AND d.Date <= a.anchor_date THEN 'current_7d'
-      WHEN d.Date > date_sub(a.anchor_date, 14) AND d.Date <= date_sub(a.anchor_date, 7) THEN 'prior_7d'
-      ELSE 'outside'
+      WHEN d.metric IN ('Fat','Protein','Net Carbs','Calories Consumed') THEN
+        CASE
+          WHEN d.Date > date_sub(a.anchor_date, 8) AND d.Date <= date_sub(a.anchor_date, 1) THEN 'current_7d'
+          WHEN d.Date > date_sub(a.anchor_date, 15) AND d.Date <= date_sub(a.anchor_date, 8) THEN 'prior_7d'
+          ELSE 'outside'
+        END
+      ELSE
+        CASE
+          WHEN d.Date > date_sub(a.anchor_date, 7) AND d.Date <= a.anchor_date THEN 'current_7d'
+          WHEN d.Date > date_sub(a.anchor_date, 14) AND d.Date <= date_sub(a.anchor_date, 7) THEN 'prior_7d'
+          ELSE 'outside'
+        END
     END AS window_name
   FROM dedup d CROSS JOIN anchor a
 )
@@ -573,8 +582,8 @@ function buildReportFromRows(rows: StatementRow[]) {
       }
       const dailyByDate = new Map(dailyValues.map((daily) => [String(daily.date), toNumber(daily.value)]));
       const anchorDate = String(row.anchor_date ?? row.current_end ?? "");
-      const currentStart = anchorDate ? dateAddDays(anchorDate, -6) : String(row.current_start ?? "");
-      const currentEnd = anchorDate || String(row.current_end ?? "");
+      const currentEnd = anchorDate ? dateAddDays(anchorDate, -1) : String(row.current_end ?? "");
+      const currentStart = currentEnd ? dateAddDays(currentEnd, -6) : String(row.current_start ?? "");
       const filledDailyValues = enumerateDates(currentStart, currentEnd).map((date) => {
         if (!dailyByDate.has(date)) return { date, value: null, band: "missing", status: "No Data" };
         const value = toNumber(dailyByDate.get(date));
