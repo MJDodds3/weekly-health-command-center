@@ -420,7 +420,7 @@ WITH nutrition_raw AS (
     d.*,
     a.anchor_date,
     CASE
-      WHEN d.metric IN ('Fat','Protein','Net Carbs','Calories Consumed','Calories Burned') THEN
+      WHEN d.metric IN ('Fat','Protein','Net Carbs','Calories Consumed','Calories Burned','Insulin Load') THEN
         CASE
           WHEN d.Date > date_sub(a.anchor_date, 8) AND d.Date <= date_sub(a.anchor_date, 1) THEN 'current_7d'
           WHEN d.Date > date_sub(a.anchor_date, 15) AND d.Date <= date_sub(a.anchor_date, 8) THEN 'prior_7d'
@@ -532,8 +532,9 @@ function buildReportFromRows(rows: StatementRow[]) {
       }
       const dailyByDate = new Map(dailyValues.map((daily) => [String(daily.date), toNumber(daily.value)]));
       const anchorDate = String(row.anchor_date ?? row.current_end ?? "");
-      const currentStart = anchorDate ? dateAddDays(anchorDate, -6) : String(row.current_start ?? "");
-      const currentEnd = anchorDate || String(row.current_end ?? "");
+      const shifted = name === "Insulin Load";
+      const currentEnd = anchorDate ? dateAddDays(anchorDate, shifted ? -1 : 0) : String(row.current_end ?? "");
+      const currentStart = currentEnd ? dateAddDays(currentEnd, -6) : String(row.current_start ?? "");
       const filledDailyValues = enumerateDates(currentStart, currentEnd).map((date) => {
         if (!dailyByDate.has(date)) {
           return {
