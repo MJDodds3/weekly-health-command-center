@@ -209,6 +209,7 @@ const insulinResistanceSnapshot = {
   range: "Optimal",
   resultDate: "1Q26",
   source: "data-dictionary" as "data-dictionary" | "databricks",
+  overlayedMetrics: [] as string[],
   components: [
     { metric: "Alanine Aminotransferase (ALT)", value: 14, score: 0 },
     { metric: "Apolipoprotein B (Apo-B)", value: 103, score: 2 },
@@ -771,9 +772,70 @@ async function executeWeeklyMetricsQuery(): Promise<StatementRow[]> {
   return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
 }
 
+const SNAPSHOT_LIVE_OVERLAY_METRICS = [
+  "Alanine Aminotransferase (ALT)",
+  "Diastolic Blood Pressure",
+];
+
+async function fetchLatestIrsLongValues(metrics: string[]): Promise<Map<string, number>> {
+  const overlay = new Map<string, number>();
+  if (!databricksReady || metrics.length === 0) return overlay;
+  const list = metrics.map((metric) => `'${metric.replace(/'/g, "''")}'`).join(", ");
+  try {
+    const rows = await executeSql(`
+      WITH ranked AS (
+        SELECT
+          metric,
+          try_cast(value AS DOUBLE) AS value,
+          ResultDate,
+          ROW_NUMBER() OVER (
+            PARTITION BY metric
+            ORDER BY ResultDate DESC
+          ) AS rn
+        FROM workspace.default.irs_long_latest
+        WHERE lower(LastName) = 'dodds'
+          AND metric IN (${list})
+          AND value IS NOT NULL
+      )
+      SELECT metric, value FROM ranked WHERE rn = 1
+    `);
+    for (const row of rows) {
+      const metric = row.metric == null ? "" : String(row.metric);
+      const value = toNumber(row.value);
+      if (metric && Number.isFinite(value)) overlay.set(metric, value);
+    }
+  } catch {
+    // Swallow — caller falls back to snapshot values for any missing metric.
+  }
+  return overlay;
+}
+
+function applySnapshotOverlay(overlay: Map<string, number>) {
+  if (overlay.size === 0) return insulinResistanceSnapshot;
+  const overlayedMetrics: string[] = [];
+  const components = insulinResistanceSnapshot.components.map((component) => {
+    if (overlay.has(component.metric)) {
+      overlayedMetrics.push(component.metric);
+      return { ...component, value: overlay.get(component.metric) as number };
+    }
+    return component;
+  });
+  return {
+    ...insulinResistanceSnapshot,
+    overlayedMetrics,
+    components,
+  };
+}
+
 async function executeInsulinResistanceQuery() {
   if (!databricksReady) return insulinResistanceSnapshot;
-  if (useDataDictionaryIRS) return insulinResistanceSnapshot;
+  if (useDataDictionaryIRS) {
+    // TODO: source live values for additional snapshot metrics once their
+    // upstream tables and column names are confirmed. Today we overlay only the
+    // metrics whose values are reliably available in workspace.default.irs_long_latest.
+    const overlay = await fetchLatestIrsLongValues(SNAPSHOT_LIVE_OVERLAY_METRICS);
+    return applySnapshotOverlay(overlay);
+  }
   const rows = await executeSql(`
     WITH latest AS (
       SELECT max(ResultDate) AS result_date
@@ -916,6 +978,7 @@ async function executeInsulinResistanceQuery() {
     range: insulinResistanceRange(score),
     resultDate: String(rows[0].ResultDate ?? ""),
     source: "databricks" as "data-dictionary" | "databricks",
+    overlayedMetrics: [] as string[],
     components,
   };
 }

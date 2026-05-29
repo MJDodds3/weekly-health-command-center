@@ -139,6 +139,7 @@ type WeeklyReport = {
     range: string;
     resultDate: string;
     source?: "data-dictionary" | "databricks";
+    overlayedMetrics?: string[];
     components: Array<{ metric: string; value: number; score: number }>;
   };
   scoreTrend: Array<{ date: string; score: number; glucose: number; glucoseIndex: number; sleepScore: number; hrv: number; hrvIndex: number }>;
@@ -649,8 +650,13 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
   if (!data) return null;
   const topDrivers = [...data.components].sort((a, b) => b.score - a.score).slice(0, 5);
   const isSnapshot = data.source !== "databricks";
+  const overlayedMetrics = data.overlayedMetrics ?? [];
+  const overlaySet = new Set(overlayedMetrics);
+  const overlayNote = overlayedMetrics.length > 0
+    ? ` Live values overlaid for ${overlayedMetrics.join(", ")} (component scores still from snapshot).`
+    : "";
   const description = isSnapshot
-    ? `IRS v2 data dictionary snapshot (resultDate ${data.resultDate}). Values are not pulled from Databricks; newer lab values upstream may not be reflected.`
+    ? `IRS v2 data dictionary snapshot (resultDate ${data.resultDate}). Values are not pulled from Databricks; newer lab values upstream may not be reflected.${overlayNote}`
     : "Latest lab-derived IRS score and component drivers from Databricks.";
   return (
     <Card id="insulin-resistance" className="scroll-mt-20" data-testid="card-insulin-resistance">
@@ -690,6 +696,7 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
               <span className="truncate">{item.metric}</span>
               <span className="flex items-center gap-2">
                 <span className="font-mono text-muted-foreground">{formatValue(item.value, "")}</span>
+                {overlaySet.has(item.metric) ? <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300">Live</Badge> : null}
                 <Badge variant="outline" className={irComponentScoreClass(item.score)}>{item.score}</Badge>
               </span>
             </div>
