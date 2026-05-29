@@ -122,6 +122,8 @@ type WeeklyReport = {
   currentWindow: string;
   priorWindow: string;
   displayedRange: string;
+  latestDataDate?: string | null;
+  latestDataLagDays?: number | null;
   score: number;
   scoreBand: string;
   scoreDelta: number;
@@ -769,7 +771,7 @@ function WeeklyDashboard() {
     setRefreshMessage(null);
 
     try {
-      const response = await apiRequest("POST", "/api/health/refresh");
+      const response = await apiRequest("POST", "/api/health/refresh?force=true");
       const payload = await response.json();
       if (payload.report) {
         queryClient.setQueryData(["/api/health/overview"], payload.report);
@@ -814,10 +816,19 @@ function WeeklyDashboard() {
             <h1 className="truncate text-base font-semibold md:text-xl">Weekly Health Command Center</h1>
             <p className="truncate text-sm text-muted-foreground">
               Current: {data.currentWindow} · Compared with: {data.priorWindow} · Last refreshed {formatRefreshTime(data.updatedAt)}
+              {data.latestDataDate ? ` · Latest data ${data.latestDataDate}` : ""}
+              {typeof data.latestDataLagDays === "number" && data.latestDataLagDays > 1
+                ? ` (${data.latestDataLagDays} days behind today)`
+                : ""}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {typeof data.latestDataLagDays === "number" && data.latestDataLagDays > 2 ? (
+            <Badge variant="destructive" data-testid="status-data-stale">
+              Data {data.latestDataLagDays}d stale
+            </Badge>
+          ) : null}
           <Badge variant={databricksStatus === "Databricks live" ? "default" : "secondary"} data-testid="status-databricks">
             {databricksStatus}
           </Badge>

@@ -642,6 +642,15 @@ function buildReportFromRows(rows: StatementRow[]) {
     } as any);
   }
 
+  const anchorDates = rows
+    .map((row) => String(row.anchor_date ?? ""))
+    .filter((value) => value.length > 0)
+    .sort();
+  const latestDataDate = anchorDates[anchorDates.length - 1] ?? String(rows[0]?.current_end ?? "");
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const latestDataLagDays = latestDataDate
+    ? Math.max(0, Math.round((Date.parse(`${todayUtc}T00:00:00Z`) - Date.parse(`${latestDataDate}T00:00:00Z`)) / (24 * 60 * 60 * 1000)))
+    : null;
   const currentStart = String(rows[0]?.current_start ?? "2026-04-28");
   const currentEnd = String(rows[0]?.current_end ?? "2026-05-04");
   const priorStart = String(rows[0]?.prior_start ?? "2026-04-21");
@@ -691,6 +700,8 @@ function buildReportFromRows(rows: StatementRow[]) {
     currentWindow: formatWindow(currentStart, currentEnd),
     priorWindow: formatWindow(priorStart, priorEnd),
     displayedRange: formatDisplayedRange(currentStart, currentEnd),
+    latestDataDate,
+    latestDataLagDays,
     score,
     scoreBand,
     scoreDelta: 0,
@@ -938,7 +949,7 @@ async function executeSql(statement: string): Promise<StatementRow[]> {
   return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
 }
 
-export async function refreshWeeklyReport() {
+export async function refreshWeeklyReport({ force = false }: { force?: boolean } = {}) {
   if (!databricksReady) {
     return {
       statusCode: 200,
@@ -955,17 +966,18 @@ export async function refreshWeeklyReport() {
   }
 
   try {
-    if (cachedRefresh && Date.now() - cachedRefresh.refreshedAt < refreshCacheTtlMs) {
+    if (!force && cachedRefresh && Date.now() - cachedRefresh.refreshedAt < refreshCacheTtlMs) {
       const minutesRemaining = Math.ceil((refreshCacheTtlMs - (Date.now() - cachedRefresh.refreshedAt)) / 60000);
+      const cachedAtIso = new Date(cachedRefresh.refreshedAt).toISOString();
       return {
         statusCode: 200,
         payload: {
           refreshed: true,
           cached: true,
-          message: `Using cached Databricks result from ${new Date(cachedRefresh.refreshedAt).toLocaleTimeString()}. This prevents repeated warehouse queries; cache expires in about ${minutesRemaining} minutes.`,
+          message: `Using cached Databricks result from ${new Date(cachedRefresh.refreshedAt).toLocaleTimeString()} (warehouse last queried). Cache expires in about ${minutesRemaining} minutes. Use Force refresh to bypass.`,
           report: {
             ...cachedRefresh.report,
-            updatedAt: new Date().toISOString(),
+            updatedAt: cachedAtIso,
           },
         },
       };
@@ -982,11 +994,19 @@ export async function refreshWeeklyReport() {
       report,
       rowCount: rows.length,
     };
+    const latestDataDate = report.latestDataDate as string | undefined;
+    const latestDataLagDays = report.latestDataLagDays as number | null | undefined;
+    const lagSuffix =
+      typeof latestDataLagDays === "number" && latestDataDate
+        ? latestDataLagDays <= 1
+          ? ` Latest day in Databricks: ${latestDataDate} (current).`
+          : ` Latest day in Databricks is ${latestDataDate} (${latestDataLagDays} days behind today) — newer data may not have synced yet.`
+        : "";
     return {
       statusCode: 200,
       payload: {
         refreshed: true,
-        message: `Refreshed ${rows.length} metric rows from Databricks.`,
+        message: `Refreshed ${rows.length} metric rows from Databricks.${lagSuffix}`,
         report,
       },
     };
@@ -1064,8 +1084,9 @@ export async function registerRoutes(
     res.json(await getOverviewReport());
   });
 
-  app.post("/api/health/refresh", async (_req, res) => {
-    const result = await refreshWeeklyReport();
+  app.post("/api/health/refresh", async (req, res) => {
+    const force = req.query.force === "true" || req.query.force === "1" || (req.body && (req.body as Record<string, unknown>).force === true);
+    const result = await refreshWeeklyReport({ force });
     res.status(result.statusCode).json(result.payload);
   });
 
