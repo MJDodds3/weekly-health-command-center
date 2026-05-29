@@ -208,6 +208,7 @@ const insulinResistanceSnapshot = {
   score: 7,
   range: "Optimal",
   resultDate: "1Q26",
+  source: "data-dictionary" as "data-dictionary" | "databricks",
   components: [
     { metric: "Alanine Aminotransferase (ALT)", value: 14, score: 0 },
     { metric: "Apolipoprotein B (Apo-B)", value: 103, score: 2 },
@@ -914,6 +915,7 @@ async function executeInsulinResistanceQuery() {
     score,
     range: insulinResistanceRange(score),
     resultDate: String(rows[0].ResultDate ?? ""),
+    source: "databricks" as "data-dictionary" | "databricks",
     components,
   };
 }

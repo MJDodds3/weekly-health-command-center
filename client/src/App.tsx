@@ -138,6 +138,7 @@ type WeeklyReport = {
     score: number;
     range: string;
     resultDate: string;
+    source?: "data-dictionary" | "databricks";
     components: Array<{ metric: string; value: number; score: number }>;
   };
   scoreTrend: Array<{ date: string; score: number; glucose: number; glucoseIndex: number; sleepScore: number; hrv: number; hrvIndex: number }>;
@@ -647,11 +648,15 @@ function irComponentScoreClass(score: number) {
 function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance"] }) {
   if (!data) return null;
   const topDrivers = [...data.components].sort((a, b) => b.score - a.score).slice(0, 5);
+  const isSnapshot = data.source !== "databricks";
+  const description = isSnapshot
+    ? `IRS v2 data dictionary snapshot (resultDate ${data.resultDate}). Values are not pulled from Databricks; newer lab values upstream may not be reflected.`
+    : "Latest lab-derived IRS score and component drivers from Databricks.";
   return (
     <Card id="insulin-resistance" className="scroll-mt-20" data-testid="card-insulin-resistance">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg"><Gauge className="size-5" />Insulin Resistance Score</CardTitle>
-        <p className="text-sm text-muted-foreground">Latest lab-derived IRS score and component drivers from Databricks.</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 md:grid-cols-[0.65fr_1.35fr]">
@@ -661,6 +666,7 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge variant="outline" className={irScoreClass(data.score)}>{data.range || "Range"}</Badge>
               <Badge variant="secondary">{data.resultDate}</Badge>
+              {isSnapshot ? <Badge variant="outline">Data dictionary snapshot</Badge> : null}
             </div>
           </div>
           <div className="rounded-md bg-muted p-4">
