@@ -232,7 +232,9 @@ const insulinResistanceSnapshot = {
   ],
 };
 
-const useDataDictionaryIRS = process.env.USE_DD_IRS_V2 !== "false";
+// Databricks is the source of truth for IRS. The data-dictionary snapshot is
+// only used as a development fallback, opted into explicitly via USE_DD_IRS_V2=true.
+const useDataDictionaryIRS = process.env.USE_DD_IRS_V2 === "true";
 
 function insulinResistanceRange(score: number) {
   if (score <= 12) return "Optimal";
@@ -777,10 +779,32 @@ const SNAPSHOT_LIVE_OVERLAY_METRICS = [
   "Diastolic Blood Pressure",
 ];
 
+// Databricks stores ALT under several aliases. Normalize them all to the
+// canonical UI metric name so values map onto the v2 component list.
+const ALT_METRIC_ALIASES = new Set([
+  "alt",
+  "alanine aminotransferase",
+  "alanine aminotransferase (alt)",
+]);
+
+function canonicalIrsMetric(metric: string): string {
+  if (ALT_METRIC_ALIASES.has(metric.trim().toLowerCase())) {
+    return "Alanine Aminotransferase (ALT)";
+  }
+  return metric;
+}
+
 async function fetchLatestIrsLongValues(metrics: string[]): Promise<Map<string, number>> {
   const overlay = new Map<string, number>();
   if (!databricksReady || metrics.length === 0) return overlay;
-  const list = metrics.map((metric) => `'${metric.replace(/'/g, "''")}'`).join(", ");
+  // Expand requested metrics to include any known aliases (e.g. ALT) so the
+  // exact-match filter in Databricks does not miss differently-labeled rows.
+  const requested = new Set(metrics);
+  if (requested.has("Alanine Aminotransferase (ALT)")) {
+    requested.add("ALT");
+    requested.add("Alanine Aminotransferase");
+  }
+  const list = Array.from(requested).map((metric) => `'${metric.replace(/'/g, "''")}'`).join(", ");
   try {
     const rows = await executeSql(`
       WITH ranked AS (
@@ -800,7 +824,7 @@ async function fetchLatestIrsLongValues(metrics: string[]): Promise<Map<string, 
       SELECT metric, value FROM ranked WHERE rn = 1
     `);
     for (const row of rows) {
-      const metric = row.metric == null ? "" : String(row.metric);
+      const metric = row.metric == null ? "" : canonicalIrsMetric(String(row.metric));
       const value = toNumber(row.value);
       if (metric && Number.isFinite(value)) overlay.set(metric, value);
     }
@@ -945,12 +969,12 @@ async function executeInsulinResistanceQuery() {
   if (!rows.length) return insulinResistanceSnapshot;
   const score = toNumber(rows[0].IRS_Score);
   const components = rows
-    .filter((row, index, all) => all.findIndex((candidate) => candidate.metric === row.metric) === index)
     .map((row) => ({
-      metric: String(row.metric),
+      metric: canonicalIrsMetric(String(row.metric)),
       value: toNumber(row.value),
       score: toNumber(row.Score),
-    }));
+    }))
+    .filter((row, index, all) => all.findIndex((candidate) => candidate.metric === row.metric) === index);
 
   if (!components.some((component) => component.metric === "Cholesterol:HDL Ratio") && ratioRows.length) {
     components.splice(10, 0, {

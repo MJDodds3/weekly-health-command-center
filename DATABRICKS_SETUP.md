@@ -65,16 +65,19 @@ LIVE_OVERVIEW=false
 
 The default live overview behavior is more current across devices, but can increase Databricks query frequency. Keep the query cache and warehouse auto-stop settings in place to control cost.
 
-## IRS v2 override
+## IRS v2 source
 
-The dashboard currently uses the updated IRS v2 definition from the data dictionary while Databricks is being updated upstream.
+By default the dashboard sources the Insulin Resistance Score and all of its
+component values live from Databricks (`workspace.default.irs_long_latest`).
+The static IRS v2 data-dictionary snapshot is only a development fallback.
+
+To force the static data-dictionary snapshot (e.g. when Databricks is
+unavailable during local development), set:
 
 ```bash
 USE_DD_IRS_V2=true
 ```
 
-This is the default. To switch back to Databricks' live `irs_long_latest` score after the upstream model is updated, set:
-
-```bash
-USE_DD_IRS_V2=false
-```
+Any other value (or leaving it unset) uses the live Databricks data. If the
+Databricks query fails or returns no rows, the dashboard falls back to the
+snapshot and labels the section as a fallback rather than live.

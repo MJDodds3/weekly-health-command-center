@@ -656,8 +656,8 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
     ? ` Live values overlaid for ${overlayedMetrics.join(", ")} (component scores still from snapshot).`
     : "";
   const description = isSnapshot
-    ? `IRS v2 data dictionary snapshot (resultDate ${data.resultDate}). Values are not pulled from Databricks; newer lab values upstream may not be reflected.${overlayNote}`
-    : "Latest lab-derived IRS score and component drivers from Databricks.";
+    ? `Development fallback: static IRS v2 snapshot (resultDate ${data.resultDate}). Databricks was unavailable, so values are not live; newer lab values upstream may not be reflected.${overlayNote}`
+    : "Live IRS score and component values sourced from Databricks (workspace.default.irs_long_latest).";
   return (
     <Card id="insulin-resistance" className="scroll-mt-20" data-testid="card-insulin-resistance">
       <CardHeader>
@@ -672,7 +672,9 @@ function InsulinResistanceCard({ data }: { data: WeeklyReport["insulinResistance
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge variant="outline" className={irScoreClass(data.score)}>{data.range || "Range"}</Badge>
               <Badge variant="secondary">{data.resultDate}</Badge>
-              {isSnapshot ? <Badge variant="outline">Data dictionary snapshot</Badge> : null}
+              {isSnapshot
+                ? <Badge variant="outline">Fallback snapshot</Badge>
+                : <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300">Databricks</Badge>}
             </div>
           </div>
           <div className="rounded-md bg-muted p-4">
