@@ -254,6 +254,86 @@ const scoreTrend = [
   { date: "05-04", score: 85, glucose: 82, glucoseIndex: 92, sleepScore: 82, hrv: 23, hrvIndex: 66 },
 ];
 
+// Build a live 7-day trend from the day-by-day metric values already fetched.
+// Reuses the same 0-100 indexes displayed elsewhere so the chart stays
+// consistent with the weekly-score math without any extra Databricks queries.
+function buildLiveScoreTrend(
+  core: Array<Record<string, unknown>>,
+  support: Array<Record<string, unknown>>,
+  currentStart: string,
+  currentEnd: string,
+) {
+  type DailyRow = { date: string; value: number };
+  const allMetrics = [...core, ...support];
+
+  const dailyByMetric = new Map<string, Map<string, number>>();
+  for (const metric of allMetrics) {
+    const name = String((metric as { name?: string }).name ?? "");
+    const daily = ((metric as { dailyValues?: Array<Record<string, unknown>> }).dailyValues ?? []) as DailyRow[];
+    if (!name || daily.length === 0) continue;
+    dailyByMetric.set(
+      name,
+      new Map(daily.map((d) => [String(d.date), Number(d.value)])),
+    );
+  }
+
+  const glucoseDaily = dailyByMetric.get("Glucose") ?? new Map<string, number>();
+  const sleepScoreDaily = dailyByMetric.get("Sleep Score") ?? new Map<string, number>();
+  const totalSleepDaily = dailyByMetric.get("Total Sleep") ?? new Map<string, number>();
+  const hrvDaily = dailyByMetric.get("Heart Rate Variability") ?? new Map<string, number>();
+
+  // Normalize a value into 0-100 given a green/red band. Higher-is-better and
+  // lower-is-better are both supported by ordering the endpoints.
+  const normalize = (value: number, green: number, red: number) => {
+    if (Number.isNaN(value)) return 0;
+    const span = green - red;
+    if (span === 0) return 0;
+    const raw = ((value - red) / span) * 100;
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  };
+
+  const days: string[] = [];
+  const startDate = new Date(currentStart + "T00:00:00Z");
+  const endDate = new Date(currentEnd + "T00:00:00Z");
+  for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10));
+  }
+
+  const rows = days
+    .map((date) => {
+      const glucose = glucoseDaily.get(date) ?? NaN;
+      const sleepScore = sleepScoreDaily.get(date) ?? NaN;
+      const totalSleep = totalSleepDaily.get(date) ?? NaN;
+      const hrv = hrvDaily.get(date) ?? NaN;
+
+      // Normalized indexes (higher = better).
+      const glucoseIndex = Number.isNaN(glucose) ? 0 : normalize(glucose, 80, 110);
+      const sleepIndex = Number.isNaN(sleepScore)
+        ? Number.isNaN(totalSleep) ? 0 : normalize(totalSleep, 8, 5)
+        : normalize(sleepScore, 90, 60);
+      const hrvIndex = Number.isNaN(hrv) ? 0 : normalize(hrv, 40, 15);
+
+      const parts = [glucoseIndex, sleepIndex, hrvIndex].filter((v) => v > 0);
+      const score = parts.length === 0
+        ? 0
+        : Math.round(parts.reduce((sum, v) => sum + v, 0) / parts.length);
+
+      return {
+        date: date.slice(5), // "MM-DD"
+        score,
+        glucose: Number.isNaN(glucose) ? 0 : Math.round(glucose),
+        glucoseIndex,
+        sleepScore: Number.isNaN(sleepScore) ? 0 : Math.round(sleepScore),
+        hrv: Number.isNaN(hrv) ? 0 : Math.round(hrv),
+        hrvIndex,
+      };
+    })
+    // Drop days with no signal at all so the chart doesn't dip to 0.
+    .filter((row) => row.score > 0 || row.glucose > 0 || row.sleepScore > 0 || row.hrv > 0);
+
+  return rows;
+}
+
 const weeklyReport = {
   mode: databricksReady ? "databricks-ready" : "databricks-export",
   updatedAt: new Date().toISOString(),
@@ -697,6 +777,8 @@ function buildReportFromRows(rows: StatementRow[]) {
     .slice(0, 4)
     .map(({ metric, text }) => ({ metric, text }));
 
+  const liveScoreTrend = buildLiveScoreTrend(core, support, currentStart, currentEnd);
+
   return {
     ...weeklyReport,
     mode: "databricks-live",
@@ -714,6 +796,7 @@ function buildReportFromRows(rows: StatementRow[]) {
     coreMetrics: core,
     supportMetrics: support,
     nutritionMetrics: nutrition,
+    scoreTrend: liveScoreTrend.length > 0 ? liveScoreTrend : weeklyReport.scoreTrend,
     databricks: {
       ...weeklyReport.databricks,
       ready: true,
