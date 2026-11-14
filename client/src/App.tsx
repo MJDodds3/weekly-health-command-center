@@ -341,16 +341,22 @@ function ThemeToggle() {
   );
 }
 
+// Calories, calorie balance and steps are always shown as whole numbers.
+const wholeNumberUnits = new Set(["cal", "cal/day", "steps"]);
+
 function formatValue(value: number | null | undefined, unit: string) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
-  const rounded = Math.abs(value) >= 100 || unit === "cal" || unit === "steps" ? Math.round(value) : Math.abs(value) < 1 ? Number(value.toFixed(2)) : Number(value.toFixed(1));
+  const rounded = Math.abs(value) >= 100 || wholeNumberUnits.has(unit) ? Math.round(value) : Math.abs(value) < 1 ? Number(value.toFixed(2)) : Number(value.toFixed(1));
   const formatted = Math.abs(rounded) >= 1000 ? rounded.toLocaleString() : Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(Math.abs(rounded) < 1 ? 2 : 1);
   return `${formatted}${unit ? ` ${unit}` : ""}`;
 }
 
-function formatDelta(delta: number | null) {
+function formatDelta(delta: number | null, unit = "") {
   if (delta === null) return "—";
-  const abs = Math.abs(delta) >= 1000 ? Math.abs(delta).toLocaleString() : Math.abs(delta).toFixed(delta % 1 === 0 ? 0 : 1);
+  if (wholeNumberUnits.has(unit)) delta = Math.round(delta);
+  const abs = Math.abs(delta) >= 1000
+    ? Math.abs(delta).toLocaleString(undefined, { maximumFractionDigits: wholeNumberUnits.has(unit) ? 0 : 1 })
+    : Math.abs(delta).toFixed(delta % 1 === 0 ? 0 : 1);
   return `${delta > 0 ? "+" : delta < 0 ? "-" : ""}${abs}`;
 }
 
@@ -516,7 +522,7 @@ function MetricRow({ metric }: { metric: CoreMetric }) {
       </div>
       <div className={`flex items-center gap-1 font-mono text-sm ${tone}`}>
         {deltaPositive ? <ArrowUp className="size-3" /> : deltaNegative ? <ArrowDown className="size-3" /> : null}
-        {formatDelta(metric.delta)}
+        {formatDelta(metric.delta, metric.unit)}
       </div>
       <div className="flex items-center justify-end gap-2">
         <Badge variant="outline" className={statusClass(metric.status, metric.band)}>{metric.status}</Badge>
@@ -542,7 +548,7 @@ function NutritionRow({ metric }: { metric: NutritionMetric }) {
       </div>
       <div className={`flex items-center gap-1 font-mono text-sm ${metric.delta > 0 ? "text-sky-300" : metric.delta < 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
         {metric.delta > 0 ? <ArrowUp className="size-3" /> : metric.delta < 0 ? <ArrowDown className="size-3" /> : null}
-        {formatDelta(metric.delta)}
+        {formatDelta(metric.delta, metric.unit)}
       </div>
       <div className="flex items-center justify-end gap-2">
         <Badge variant="outline" className={statusClass(status, band)}>{status}</Badge>
@@ -1060,7 +1066,7 @@ function WeeklyDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="font-mono font-semibold">{formatValue(metric.value, metric.unit)}</p>
-                      {metric.delta !== null ? <p className="font-mono text-xs text-muted-foreground">{formatDelta(metric.delta)} vs prior</p> : null}
+                      {metric.delta !== null ? <p className="font-mono text-xs text-muted-foreground">{formatDelta(metric.delta, metric.unit)} vs prior</p> : null}
                     </div>
                   </div>
                 ))}
