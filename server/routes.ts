@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "node:http";
+import { buildWeeklyMetricsSql, isEmiAccessError, type WeeklySqlVariant } from "./weeklyMetricsSql";
 
 const databricksReady =
   Boolean(process.env.DATABRICKS_HOST) &&
@@ -385,170 +386,6 @@ export function getWeeklyReport() {
   return weeklyReport;
 }
 
-const weeklyMetricsSql = `
-WITH nutrition_raw AS (
-  SELECT
-    'Dodds, Matthew' AS Name,
-    CAST(timestamp AS DATE) AS Date,
-    CAST(fat AS DOUBLE) AS Fat,
-    CAST(protein AS DOUBLE) AS Protein,
-    CAST(carbohydrate AS DOUBLE) - CAST(fiber AS DOUBLE) AS Net_Carbs,
-    'cronometer' AS source
-  FROM workspace.default.metric_macronutrients
-  WHERE user_uuid IN (
-      SELECT DISTINCT user_uuid
-      FROM workspace.default.dailytracker_joined
-      WHERE last_name = 'Dodds'
-        AND first_name = 'Matthew'
-        AND user_uuid IS NOT NULL
-    )
-    AND CAST(timestamp AS DATE) >= date_sub(current_date(), 21)
-), nutrition_long AS (
-  SELECT Name, Date, 'Fat' AS metric, Fat AS value, source FROM nutrition_raw WHERE Fat IS NOT NULL UNION ALL
-  SELECT Name, Date, 'Protein' AS metric, Protein AS value, source FROM nutrition_raw WHERE Protein IS NOT NULL UNION ALL
-  SELECT Name, Date, 'Net Carbs' AS metric, Net_Carbs AS value, source FROM nutrition_raw WHERE Net_Carbs IS NOT NULL
-), preferences AS (
-  SELECT 'Weight' AS metric, 'withings2' AS primary_source UNION ALL
-  SELECT 'Body Fat' AS metric, 'withings2' AS primary_source UNION ALL
-  SELECT 'Visceral Fat' AS metric, 'withings2' AS primary_source UNION ALL
-  SELECT 'Cellular Water Ratio' AS metric, 'withings2' AS primary_source UNION ALL
-  SELECT 'Calories Consumed' AS metric, 'cronometer' AS primary_source UNION ALL
-  SELECT 'Insulin Load' AS metric, 'cronometer' AS primary_source UNION ALL
-  SELECT 'Glucose' AS metric, 'healthkit2' AS primary_source UNION ALL
-  SELECT 'Ketones' AS metric, 'mymojohealth' AS primary_source UNION ALL
-  SELECT 'Calories Burned' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Steps' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Vo2max' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Sleep Score' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Sleep Efficiency' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Resting HR' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Resilience' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Total Sleep' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Heart Rate Variability' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Stress Level' AS metric, 'oura' AS primary_source UNION ALL
-  SELECT 'Fat' AS metric, 'cronometer' AS primary_source UNION ALL
-  SELECT 'Protein' AS metric, 'cronometer' AS primary_source UNION ALL
-  SELECT 'Net Carbs' AS metric, 'cronometer' AS primary_source
-), anchor AS (
-  SELECT max(Date) AS anchor_date
-  FROM (
-    SELECT CAST(dt.date AS DATE) AS Date
-    FROM workspace.default.dailytracker_joined dt
-    WHERE dt.last_name = 'Dodds'
-      AND dt.first_name = 'Matthew'
-      AND CAST(dt.date AS DATE) >= date_sub(current_date(), 21)
-      AND dt.metric IN (
-        'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
-        'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
-        'Heart Rate Variability','Stress Level'
-      )
-    UNION ALL
-    SELECT Date FROM nutrition_long
-  )
-), ranked AS (
-  SELECT
-    CONCAT(dt.last_name, ', ', dt.first_name) AS Name,
-    CAST(dt.date AS DATE) AS Date,
-    CASE
-      WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
-      WHEN lower(dt.metric) = 'protein' THEN 'Protein'
-      WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
-      ELSE dt.metric
-    END AS metric,
-    dt.value,
-    dt.source,
-    ROW_NUMBER() OVER (
-      PARTITION BY dt.last_name, dt.first_name, CAST(dt.date AS DATE), CASE
-        WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
-        WHEN lower(dt.metric) = 'protein' THEN 'Protein'
-        WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
-        ELSE dt.metric
-      END
-      ORDER BY
-        CASE WHEN prefs.primary_source IS NOT NULL AND dt.source = prefs.primary_source THEN 1 ELSE 2 END,
-        CASE WHEN dt.metric = 'Steps' THEN dt.value ELSE NULL END DESC
-    ) AS rn
-  FROM workspace.default.dailytracker_joined dt
-  LEFT JOIN preferences prefs ON CASE
-    WHEN lower(dt.metric) IN ('fat','total fat') THEN 'Fat'
-    WHEN lower(dt.metric) = 'protein' THEN 'Protein'
-    WHEN lower(dt.metric) IN ('net carbs','net carbohydrates','net carbohydrate') THEN 'Net Carbs'
-    ELSE dt.metric
-  END = prefs.metric
-  CROSS JOIN anchor a
-  WHERE dt.last_name = 'Dodds'
-    AND dt.first_name = 'Matthew'
-    AND CAST(dt.date AS DATE) > date_sub(a.anchor_date, 15)
-    AND CAST(dt.date AS DATE) <= a.anchor_date
-    AND dt.metric IN (
-    'Weight','Body Fat','Visceral Fat','Cellular Water Ratio','Calories Consumed','Insulin Load','Glucose','Ketones',
-    'Calories Burned','Steps','Vo2max','Sleep Score','Sleep Efficiency','Resting HR','Resilience','Total Sleep',
-    'Heart Rate Variability','Stress Level'
-  )
-  UNION ALL
-  SELECT
-    Name,
-    Date,
-    metric,
-    value,
-    source,
-    1 AS rn
-  FROM nutrition_long n
-  CROSS JOIN anchor a
-  WHERE n.Date > date_sub(a.anchor_date, 15)
-    AND n.Date <= date_sub(a.anchor_date, 1)
-), dedup AS (
-  SELECT * FROM ranked WHERE rn = 1 AND Name = 'Dodds, Matthew'
-), windows AS (
-  SELECT
-    d.*,
-    a.anchor_date,
-    CASE
-      WHEN d.metric IN ('Fat','Protein','Net Carbs','Calories Consumed','Calories Burned','Insulin Load') THEN
-        CASE
-          WHEN d.Date > date_sub(a.anchor_date, 8) AND d.Date <= date_sub(a.anchor_date, 1) THEN 'current_7d'
-          WHEN d.Date > date_sub(a.anchor_date, 15) AND d.Date <= date_sub(a.anchor_date, 8) THEN 'prior_7d'
-          ELSE 'outside'
-        END
-      ELSE
-        CASE
-          WHEN d.Date > date_sub(a.anchor_date, 7) AND d.Date <= a.anchor_date THEN 'current_7d'
-          WHEN d.Date > date_sub(a.anchor_date, 14) AND d.Date <= date_sub(a.anchor_date, 7) THEN 'prior_7d'
-          ELSE 'outside'
-        END
-    END AS window_name
-  FROM dedup d CROSS JOIN anchor a
-)
-SELECT
-  metric,
-  first(source) AS source,
-  max(anchor_date) AS anchor_date,
-  min(CASE WHEN window_name='current_7d' THEN Date END) AS current_start,
-  max(CASE WHEN window_name='current_7d' THEN Date END) AS current_end,
-  min(CASE WHEN window_name='prior_7d' THEN Date END) AS prior_start,
-  max(CASE WHEN window_name='prior_7d' THEN Date END) AS prior_end,
-  avg(CASE WHEN window_name='current_7d' THEN value END) AS current_avg,
-  count(CASE WHEN window_name='current_7d' THEN 1 END) AS current_n,
-  avg(CASE WHEN window_name='prior_7d' THEN value END) AS prior_avg,
-  count(CASE WHEN window_name='prior_7d' THEN 1 END) AS prior_n,
-  avg(CASE WHEN window_name='current_7d' THEN value END) - avg(CASE WHEN window_name='prior_7d' THEN value END) AS delta,
-  to_json(
-    array_sort(
-      collect_list(named_struct('date', CAST(Date AS STRING), 'value', value))
-      FILTER (WHERE window_name='current_7d')
-    )
-  ) AS daily_values
-FROM windows
-WHERE window_name IN ('current_7d','prior_7d')
-GROUP BY metric
-ORDER BY CASE metric
-  WHEN 'Weight' THEN 1 WHEN 'Body Fat' THEN 2 WHEN 'Visceral Fat' THEN 3 WHEN 'Cellular Water Ratio' THEN 4
-  WHEN 'Glucose' THEN 5 WHEN 'Ketones' THEN 6 WHEN 'Insulin Load' THEN 7 WHEN 'Total Sleep' THEN 8
-  WHEN 'Sleep Efficiency' THEN 9 WHEN 'Sleep Score' THEN 10 WHEN 'Heart Rate Variability' THEN 11
-  WHEN 'Resting HR' THEN 12 WHEN 'Stress Level' THEN 13 WHEN 'Resilience' THEN 14 WHEN 'Steps' THEN 15
-  WHEN 'Vo2max' THEN 16 WHEN 'Calories Burned' THEN 17 WHEN 'Calories Consumed' THEN 18
-  WHEN 'Fat' THEN 19 WHEN 'Protein' THEN 20 WHEN 'Net Carbs' THEN 21 ELSE 99 END
-`;
 
 type StatementRow = Record<string, string | number | null>;
 
@@ -801,7 +638,8 @@ function buildReportFromRows(rows: StatementRow[]) {
       ...weeklyReport.databricks,
       ready: true,
       warehouseId: process.env.DATABRICKS_WAREHOUSE_ID,
-      sourceTable: "workspace.default.dailytracker_joined",
+      sourceTable: weeklySourceLabel(),
+      sourceMode: lastWeeklyVariant,
     },
   };
 }
@@ -826,35 +664,30 @@ async function databricksRequest(path: string, init?: RequestInit) {
   return response.json();
 }
 
+let lastWeeklyVariant: WeeklySqlVariant = "direct-partial";
+
+// Try the full direct-API query first (needs the emi catalog grant). If the
+// dashboard's Databricks principal can't read emi.dev yet, fall back to the
+// partial variant, which reads only the Apple Health / Keto-Mojo metrics from
+// the legacy tables. Switches over automatically once the grant exists.
 async function executeWeeklyMetricsQuery(): Promise<StatementRow[]> {
-  const submit = await databricksRequest("/api/2.0/sql/statements", {
-    method: "POST",
-    body: JSON.stringify({
-      warehouse_id: process.env.DATABRICKS_WAREHOUSE_ID,
-      statement: weeklyMetricsSql,
-      wait_timeout: "10s",
-      on_wait_timeout: "CONTINUE",
-      format: "JSON_ARRAY",
-    }),
-  });
-
-  const statementId = submit.statement_id;
-  if (!statementId) throw new Error("Databricks did not return a statement_id.");
-
-  let result = submit;
-  for (let attempt = 0; attempt < 90; attempt += 1) {
-    const state = result.status?.state;
-    if (state === "SUCCEEDED") break;
-    if (state === "FAILED" || state === "CANCELED") throw new Error(`Databricks statement ${state}: ${JSON.stringify(result.status)}`);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    result = await databricksRequest(`/api/2.0/sql/statements/${statementId}`);
+  try {
+    const rows = await executeSql(buildWeeklyMetricsSql("direct-full"));
+    lastWeeklyVariant = "direct-full";
+    return rows;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isEmiAccessError(message)) throw error;
+    const rows = await executeSql(buildWeeklyMetricsSql("direct-partial"));
+    lastWeeklyVariant = "direct-partial";
+    return rows;
   }
+}
 
-  if (result.status?.state !== "SUCCEEDED") throw new Error("Databricks statement timed out.");
-
-  const columns = result.manifest?.schema?.columns?.map((column: { name: string }) => column.name) ?? [];
-  const data = result.result?.data_array ?? [];
-  return data.map((row: Array<string | number | null>) => Object.fromEntries(columns.map((column: string, index: number) => [column, row[index]])));
+function weeklySourceLabel(): string {
+  return lastWeeklyVariant === "direct-full"
+    ? "Direct APIs: oura_summary, withings_summary, emi.dev.apple_health_daily, emi.dev.keto_mojo_daily (Fat: metric_macronutrients)"
+    : "Direct APIs: oura_summary, withings_summary; nutrition, glucose, ketones, VO2max, insulin load from legacy tables until emi.dev access is granted";
 }
 
 const SNAPSHOT_LIVE_OVERLAY_METRICS = [
