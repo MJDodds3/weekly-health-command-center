@@ -3,6 +3,7 @@
 // Data sources (moved off Heads Up Health, Nov 2026):
 //   Direct APIs built by Lisa Lee
 //     - workspace.default.oura_summary      Oura: sleep, HRV, resting HR, steps, calories burned, stress, resilience
+//     - workspace.default.whoop_summary     WHOOP: day strain
 //     - workspace.default.withings_summary  Withings: weight, body fat, visceral fat, cellular water ratio
 //     - emi.dev.apple_health_daily          EMIHealthSync: calories consumed, protein, net carbs, glucose, VO2max, insulin load
 //     - emi.dev.keto_mojo_daily             Keto-Mojo: ketones
@@ -25,7 +26,7 @@ export type WeeklySqlVariant = "direct-full" | "direct-partial";
 const ALL_METRICS = [
   "Weight", "Body Fat", "Visceral Fat", "Cellular Water Ratio", "Calories Consumed", "Insulin Load", "Glucose", "Ketones",
   "Calories Burned", "Steps", "Vo2max", "Sleep Score", "Sleep Efficiency", "Resting HR", "Resilience", "Total Sleep",
-  "Heart Rate Variability", "Stress Level",
+  "Heart Rate Variability", "Stress Level", "Strain",
 ];
 
 // Metrics that come from emi.dev tables when the grant exists.
@@ -50,6 +51,7 @@ const ouraWithingsSql = `
   UNION ALL SELECT day, 'Resilience',
     CASE lower(Resilience) WHEN 'limited' THEN 1.0 WHEN 'adequate' THEN 2.0 WHEN 'solid' THEN 3.0 WHEN 'strong' THEN 4.0 WHEN 'exceptional' THEN 5.0 END, 'oura-api'
     FROM workspace.default.oura_summary
+  UNION ALL SELECT day, 'Strain', CAST(Strain AS DOUBLE), 'whoop-api' FROM workspace.default.whoop_summary
   UNION ALL SELECT day, 'Weight', CAST(Weight AS DOUBLE), 'withings-api' FROM workspace.default.withings_summary
   UNION ALL SELECT day, 'Body Fat', CAST(Body_Fat AS DOUBLE), 'withings-api' FROM workspace.default.withings_summary
   UNION ALL SELECT day, 'Visceral Fat', CAST(Visceral_Fat AS DOUBLE), 'withings-api' FROM workspace.default.withings_summary
@@ -178,7 +180,7 @@ ORDER BY CASE metric
   WHEN 'Glucose' THEN 5 WHEN 'Ketones' THEN 6 WHEN 'Insulin Load' THEN 7 WHEN 'Total Sleep' THEN 8
   WHEN 'Sleep Efficiency' THEN 9 WHEN 'Sleep Score' THEN 10 WHEN 'Heart Rate Variability' THEN 11
   WHEN 'Resting HR' THEN 12 WHEN 'Stress Level' THEN 13 WHEN 'Resilience' THEN 14 WHEN 'Steps' THEN 15
-  WHEN 'Vo2max' THEN 16 WHEN 'Calories Burned' THEN 17 WHEN 'Calories Consumed' THEN 18
+  WHEN 'Vo2max' THEN 16 WHEN 'Strain' THEN 16.5 WHEN 'Calories Burned' THEN 17 WHEN 'Calories Consumed' THEN 18
   WHEN 'Fat' THEN 19 WHEN 'Protein' THEN 20 WHEN 'Net Carbs' THEN 21 ELSE 99 END
 `;
 }

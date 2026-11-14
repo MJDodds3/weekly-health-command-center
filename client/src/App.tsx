@@ -392,6 +392,7 @@ const sparklineDomains: Record<string, { min: number; max: number }> = {
   "Resilience": { min: 0, max: 6 },
   "Steps": { min: 0, max: 15000 },
   "Vo2max": { min: 30, max: 60 },
+  "Strain": { min: 0, max: 21 },
   "Fat": { min: 0, max: 250 },
   "Protein": { min: 0, max: 250 },
   "Net Carbs": { min: 0, max: 150 },

@@ -40,6 +40,7 @@ const metricMeta: Record<string, {
   "Resilience": { group: "Cardiovascular & Stress", unit: "", status: "On Target", direction: "neutral", scoreImpact: 5 },
   "Steps": { group: "Activity", unit: "steps", status: "Above Target", direction: "warning", scoreImpact: 3 },
   "Vo2max": { group: "Activity", unit: "ml/kg/min", status: "On Target", direction: "positive", scoreImpact: 5 },
+  "Strain": { group: "Activity", unit: "", status: "On Target", direction: "positive", scoreImpact: 5 },
   "Calories Burned": { unit: "cal", status: "On Target", direction: "neutral", scoreImpact: 5 },
   "Calories Consumed": { unit: "cal", status: "Above Target", direction: "warning", scoreImpact: 3, lowerIsBetter: true },
 };
@@ -73,6 +74,8 @@ const mjdRanges: Record<string, {
   "Resilience": { green: ">4", yellow: "2-4", red: "<2" },
   "Steps": { green: ">10000", yellow: "7000-10000", red: "<7000" },
   "Vo2max": { green: ">45", yellow: "35-45", red: "<35" },
+  // WHOOP day strain (0-21 scale).
+  "Strain": { green: "10-20", yellow: "<10", red: ">20" },
   "Calories Consumed": { green: "<2500", yellow: "2500-3000", red: ">3000" },
   "Fat": { green: ">200", yellow: "100-200", red: "<100" },
   "Protein": { green: "<100", yellow: "100-175", red: ">175" },
@@ -134,7 +137,7 @@ function evaluateTarget(metric: string, value: number): {
 const metricOrder = [
   "Weight", "Body Fat", "Visceral Fat", "Cellular Water Ratio", "Glucose", "Ketones", "Insulin Load",
   "Total Sleep", "Sleep Efficiency", "Sleep Score", "Heart Rate Variability", "Resting HR", "Stress Level",
-  "Resilience", "Steps", "Vo2max", "Calories Burned", "Calories Consumed",
+  "Resilience", "Steps", "Vo2max", "Strain", "Calories Burned", "Calories Consumed",
 ];
 
 const focusPriority: Record<string, number> = {
@@ -148,6 +151,7 @@ const focusPriority: Record<string, number> = {
   "Stress Level": 8,
   "Steps": 9,
   "Vo2max": 10,
+  "Strain": 10.5,
   "Visceral Fat": 11,
   "Body Fat": 12,
   "Cellular Water Ratio": 13,
