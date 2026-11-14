@@ -53,10 +53,12 @@ const nutritionMeta: Record<string, { unit: string }> = {
 
 type TargetBand = "green" | "yellow" | "red";
 
+// yellow may list several ranges (e.g. below AND above green); red is optional
+// for metrics where no value should be flagged red.
 const mjdRanges: Record<string, {
   green: string;
-  yellow: string;
-  red: string;
+  yellow: string | string[];
+  red?: string;
 }> = {
   "Weight": { green: "<150", yellow: "150-160", red: ">160" },
   "Body Fat": { green: "<10", yellow: "10-15", red: ">15" },
@@ -74,8 +76,8 @@ const mjdRanges: Record<string, {
   "Resilience": { green: ">4", yellow: "2-4", red: "<2" },
   "Steps": { green: ">10000", yellow: "7000-10000", red: "<7000" },
   "Vo2max": { green: ">45", yellow: "35-45", red: "<35" },
-  // WHOOP day strain (0-21 scale).
-  "Strain": { green: "10-20", yellow: "<10", red: ">20" },
+  // WHOOP day strain (0-21 scale): green 10-16, yellow below 10 or above 16, no red.
+  "Strain": { green: "10-16", yellow: ["<10", ">16"] },
   "Calories Consumed": { green: "<2500", yellow: "2500-3000", red: ">3000" },
   "Fat": { green: ">200", yellow: "100-200", red: "<100" },
   "Protein": { green: "<100", yellow: "100-175", red: ">175" },
@@ -120,12 +122,14 @@ function evaluateTarget(metric: string, value: number): {
     };
   }
 
+  const yellowRanges = Array.isArray(ranges.yellow) ? ranges.yellow : [ranges.yellow];
+  const matchedYellow = yellowRanges.find((expr) => matchesRange(value, expr));
   const band: TargetBand = matchesRange(value, ranges.green)
     ? "green"
-    : matchesRange(value, ranges.yellow)
+    : matchedYellow || !ranges.red
       ? "yellow"
       : "red";
-  const expression = ranges[band];
+  const expression = band === "green" ? ranges.green : band === "yellow" ? (matchedYellow ?? yellowRanges[0]) : (ranges.red as string);
   return {
     status: statusFromExpression(expression),
     band,
