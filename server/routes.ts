@@ -686,7 +686,7 @@ async function executeWeeklyMetricsQuery(): Promise<StatementRow[]> {
 
 function weeklySourceLabel(): string {
   return lastWeeklyVariant === "direct-full"
-    ? "Direct APIs: oura_summary, withings_summary, emi.dev.apple_health_daily, emi.dev.keto_mojo_daily (Fat: metric_macronutrients)"
+    ? "Direct APIs: oura_summary, withings_summary, emi.dev.apple_health_daily, emi.dev.keto_mojo_daily"
     : "Direct APIs: oura_summary, withings_summary; nutrition, glucose, ketones, VO2max, insulin load from legacy tables until emi.dev access is granted";
 }
 

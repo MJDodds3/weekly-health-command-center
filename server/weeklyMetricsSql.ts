@@ -13,8 +13,7 @@
 // (dailytracker_joined / metric_macronutrients). Once the grant is in place the
 // emi variant succeeds and the legacy tables are no longer read for them.
 //
-// Fat is not yet a column in emi.dev.apple_health_daily, so Fat stays on the
-// legacy macronutrient table until that column is added.
+// Fat reads emi.dev.apple_health_daily.Dietary_Fat (added Nov 14, 2026).
 //
 // Output columns are unchanged from the original query so buildReportFromRows
 // keeps working: metric, source, anchor_date, current_start, current_end,
@@ -30,7 +29,7 @@ const ALL_METRICS = [
 ];
 
 // Metrics that come from emi.dev tables when the grant exists.
-export const EMI_METRICS = ["Calories Consumed", "Insulin Load", "Glucose", "Ketones", "Vo2max", "Protein", "Net Carbs"];
+export const EMI_METRICS = ["Calories Consumed", "Insulin Load", "Glucose", "Ketones", "Vo2max", "Protein", "Net Carbs", "Fat"];
 
 const sqlList = (items: string[]) => items.map((item) => `'${item.replace(/'/g, "''")}'`).join(", ");
 
@@ -62,6 +61,7 @@ const ouraWithingsSql = `
 const emiSql = `
   UNION ALL SELECT day, 'Calories Consumed', CAST(Calories_Consumed AS DOUBLE), 'apple-health' FROM emi.dev.apple_health_daily
   UNION ALL SELECT day, 'Protein', CAST(Protein AS DOUBLE), 'apple-health' FROM emi.dev.apple_health_daily
+  UNION ALL SELECT day, 'Fat', CAST(Dietary_Fat AS DOUBLE), 'apple-health' FROM emi.dev.apple_health_daily
   UNION ALL SELECT day, 'Net Carbs', CAST(Carbohydrates AS DOUBLE) - coalesce(CAST(Fiber AS DOUBLE), 0), 'apple-health' FROM emi.dev.apple_health_daily
   UNION ALL SELECT day, 'Glucose', CAST(Blood_Glucose AS DOUBLE), 'apple-health' FROM emi.dev.apple_health_daily
   UNION ALL SELECT day, 'Vo2max', CAST(VO2max AS DOUBLE), 'apple-health' FROM emi.dev.apple_health_daily
@@ -73,7 +73,7 @@ export function buildWeeklyMetricsSql(variant: WeeklySqlVariant): string {
   const useEmi = variant === "direct-full";
   // Metrics still read from the legacy Heads Up tables in this variant.
   const legacyTrackerMetrics = useEmi ? [] : ["Calories Consumed", "Insulin Load", "Glucose", "Ketones", "Vo2max"];
-  const legacyNutritionMetrics = useEmi ? ["Fat"] : ["Fat", "Protein", "Net Carbs"];
+  const legacyNutritionMetrics = useEmi ? [] : ["Fat", "Protein", "Net Carbs"];
 
   const legacyTrackerSql = legacyTrackerMetrics.length === 0 ? "" : `
   UNION ALL
@@ -94,7 +94,7 @@ export function buildWeeklyMetricsSql(variant: WeeklySqlVariant): string {
       AND dt.metric IN (${sqlList(legacyTrackerMetrics)})
   ) WHERE rn = 1`;
 
-  const legacyNutritionSql = `
+  const legacyNutritionSql = legacyNutritionMetrics.length === 0 ? "" : `
   UNION ALL
   SELECT Date, metric, value, 'cronometer' AS source FROM (
     SELECT CAST(timestamp AS DATE) AS Date, CAST(fat AS DOUBLE) AS Fat, CAST(protein AS DOUBLE) AS Protein,
