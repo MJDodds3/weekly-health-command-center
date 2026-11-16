@@ -346,7 +346,7 @@ function buildLiveScoreTrend(
 const weeklyReport = {
   mode: databricksReady ? "databricks-ready" : "databricks-export",
   updatedAt: new Date().toISOString(),
-  cadence: "Fridays at 3:00 PM PT",
+  cadence: "Daily at 9:00 AM PT",
   person: "Matthew Dodds",
   organization: "Eternity Medicine Institute",
   currentWindow: "Apr 28-May 4",
@@ -377,7 +377,7 @@ const weeklyReport = {
     ready: true,
     requiredEnv: ["DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"],
     queryMode: "past_7_days_vs_prior_7_days",
-    schedule: "0 22 * * FRI",
+    schedule: "0 17 * * *",
     warehouseId: "33ede2bc605f8cd7",
     sourceTable: "workspace.default.dailytracker_joined",
     suggestedTables: [

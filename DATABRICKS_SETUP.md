@@ -53,7 +53,7 @@ The site also includes a scheduled Netlify Function:
 netlify/functions/scheduled-weekly-refresh.ts
 ```
 
-It runs Friday at 22:00 UTC, which is Friday 3:00 PM during Pacific Daylight Time, refreshes from Databricks, and writes the shared latest report to Netlify Blobs.
+It runs daily at 17:00 UTC (9:00 AM Pacific Standard Time, 10:00 AM during daylight time), 30 minutes after the 8:30 AM Pacific summary-table rebuild, refreshes from Databricks, and writes the shared latest report to Netlify Blobs.
 
 If Netlify Blobs is not available for the site, page loads read the latest Databricks 14-day rollup directly by default when Databricks env vars are configured.
 

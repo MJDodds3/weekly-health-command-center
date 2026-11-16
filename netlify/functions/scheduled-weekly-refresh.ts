@@ -2,7 +2,9 @@ import { refreshWeeklyReport } from "../../server/routes";
 import { setStoredReport } from "./report-store";
 
 export const config = {
-  schedule: "0 22 * * 5",
+  // Daily at 17:00 UTC = 9:00 AM Pacific (standard time), 30 minutes after
+  // Lisa's 8:30 AM summary-table rebuild. 10:00 AM during daylight time.
+  schedule: "0 17 * * *",
 };
 
 export const handler = async () => {
