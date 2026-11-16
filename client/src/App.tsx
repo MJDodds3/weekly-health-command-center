@@ -176,7 +176,7 @@ const fallbackCoreMetrics: CoreMetric[] = [
 const fallbackReport: WeeklyReport = {
   mode: "standalone databricks-export",
   updatedAt: new Date().toISOString(),
-  cadence: "Daily at 9:00 AM PT",
+  cadence: "Daily at 9:00 AM and 9:00 PM PT",
   person: "Matthew Dodds",
   organization: "Eternity Medicine Institute",
   currentWindow: "Apr 28-May 4",
@@ -236,7 +236,7 @@ const fallbackReport: WeeklyReport = {
     ready: true,
     requiredEnv: ["DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"],
     queryMode: "past_7_days_vs_prior_7_days",
-    schedule: "0 17 * * *",
+    schedule: "0 5,17 * * *",
     warehouseId: "33ede2bc605f8cd7",
     sourceTable: "workspace.default.dailytracker_joined",
     suggestedTables: ["workspace.default.dailytracker_joined", "workspace.default.dailyperformance_joined", "workspace.default.labs_joined", "workspace.default.bodycomp", "workspace.default.metabolism"],
@@ -320,7 +320,7 @@ function AppSidebar({ activeSection, onNavigate }: { activeSection: string; onNa
       <SidebarFooter className="px-4 py-4">
         <div className="rounded-md bg-sidebar-accent p-3">
           <p className="text-xs font-medium">Cadence</p>
-          <p className="mt-1 text-xs text-muted-foreground">Runs daily at 9 AM PT against Databricks rolling 7-day data.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Runs daily at 9 AM and 9 PM PT against Databricks rolling 7-day data.</p>
         </div>
       </SidebarFooter>
     </Sidebar>
